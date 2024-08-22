@@ -1,0 +1,46 @@
+name: blocked
+description: A creative spin on the classic sliding puzzle game.
+
+publish_to: "none"
+
+version: 3.0.0+7
+
+environment:
+  sdk: ">=2.15.1 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  adaptive_theme: ^2.3.0
+  archive: ^3.1.11
+  async: ^2.8.2
+  get: ^4.6.5
+  google_mobile_ads: ^2.3.0
+  cupertino_icons: ^1.0.2
+  equatable: ^2.0.3
+  flex_color_scheme: ^7.1.3
+  flutter_bloc: ^8.0.1
+  widget_bindings: ^1.0.0+1
+  flutter_portal: ^0.4.0
+  material_design_icons_flutter: ^5.0.6595
+  shared_preferences: ^2.0.1
+  google_fonts: ^4.0.3
+  yaml: ^3.1.0
+  assets_audio_player: ^3.0.6
+  easy_audience_network: ^0.0.6
+  facebook_audience_network: ^1.0.1
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^1.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/audio/bmusic.mp3
