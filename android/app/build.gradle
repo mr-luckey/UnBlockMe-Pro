@@ -19,12 +19,12 @@ if (flutterRoot == null) {
 
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
-    flutterVersionCode = '3'
+    flutterVersionCode = '6'
 }
 
 def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
-    flutterVersionName = '3.0'
+    flutterVersionName = '6.0'
 }
 
 apply plugin: 'com.android.application'
@@ -35,7 +35,8 @@ android {
     packagingOptions {
         exclude 'path/to/conflicting/classes'
     }
-    compileSdkVersion 33
+    compileSdkVersion 34
+
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -53,7 +54,7 @@ android {
     defaultConfig {
         applicationId "com.appware.blocked"
         minSdkVersion 21
-        //noinspection OldTargetApi
+//        noinspection OldTargetApi
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -71,6 +72,7 @@ android {
         release {
             signingConfig signingConfigs.release
         }
+
     }
 
 
@@ -83,6 +85,7 @@ flutter {
 
 dependencies {
 //    implementation "com.google.android.gms:play-services-ads:22.2.0"
+    // implementation 'com.facebook.infer.annotation:infer-annotation:0.18.0'
     implementation "androidx.multidex:multidex:2.0.1"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
