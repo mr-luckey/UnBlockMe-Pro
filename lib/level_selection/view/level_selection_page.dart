@@ -14,7 +14,7 @@ class LevelSelectionPage extends StatelessWidget {
   LevelSelectionPage(this.chapter, {Key? key})
       : levels = chapter.levels.map((data) => data.toLevel()).toList(),
         super(key: key) {
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   final LevelChapter chapter;

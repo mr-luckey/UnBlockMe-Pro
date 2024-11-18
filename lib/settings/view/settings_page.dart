@@ -33,7 +33,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   @override

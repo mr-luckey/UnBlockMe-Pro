@@ -35,7 +35,7 @@ class _BoardControlsState extends State<BoardControls> {
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   @override

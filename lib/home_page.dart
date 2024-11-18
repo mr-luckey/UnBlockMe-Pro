@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
 
     assetsAudioPlayer.open(
       Audio('assets/audio/bmusic.mp3'),

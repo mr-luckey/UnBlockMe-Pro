@@ -14,7 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AdManager();
-  FacebookAudienceNetwork.init();
+  // FacebookAudienceNetwork.init();
   // MobileAds.instance.initialize();
   final levels = await readLevelsFromYaml();
   final savedThemeMode = await AdaptiveTheme.getThemeMode();

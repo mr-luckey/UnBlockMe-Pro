@@ -23,7 +23,7 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
     required this.navigatorCubit,
   })  : _navigatorKey = navigatorKey,
         isLoaded = false {
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   final GlobalKey<NavigatorState> _navigatorKey;

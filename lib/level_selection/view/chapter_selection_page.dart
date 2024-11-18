@@ -11,7 +11,7 @@ import '../../ADs/ad_manager.dart';
 
 class ChapterSelectionPage extends StatelessWidget {
   ChapterSelectionPage(this.chapters, {Key? key}) : super(key: key) {
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   final List<LevelChapter> chapters;

@@ -8,7 +8,7 @@ import '../../ADs/ad_manager.dart';
 
 class GeneratedLevelPage extends StatelessWidget {
   GeneratedLevelPage(this.mapString, {Key? key}) : super(key: key) {
-    adManager.addAds(true, true, true);
+    adManager.addAds(true, true, false);
   }
 
   final String mapString;
