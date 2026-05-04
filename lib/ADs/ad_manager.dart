@@ -300,10 +300,23 @@ class AdManager {
 
   // Example rewarded ad IDs for quick testing; replace later with your own IDs.
   final List<String> hintRewardedAdIds = [
-    "ca-app-pub-3940256099942544/5224354917",
+    "ca-app-pub-5561438827097019/6764030149",
+    "ca-app-pub-5561438827097019/5450948476",
+    "ca-app-pub-5561438827097019/7397402617",
+    "ca-app-pub-5561438827097019/9999515220",
+    "ca-app-pub-5561438827097019/9535557351",
+    "ca-app-pub-5561438827097019/5488501134",
+    "ca-app-pub-5561438827097019/7373351887",
   ];
   final List<String> autoSolveRewardedAdIds = [
-    "ca-app-pub-3940256099942544/5224354917",
+    "ca-app-pub-5561438827097019/5683942253",
+    "ca-app-pub-5561438827097019/4283230677",
+    "ca-app-pub-5561438827097019/2824785130",
+    "ca-app-pub-5561438827097019/4747188542 ",
+    "ca-app-pub-5561438827097019/1657067333",
+    "ca-app-pub-5561438827097019/4175419460",
+    "ca-app-pub-5561438827097019/2121025205",
+    "ca-app-pub-5561438827097019/2862337799",
   ];
 
   int bannerAdIndex = 0;
