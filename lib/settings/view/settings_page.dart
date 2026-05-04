@@ -6,7 +6,7 @@ import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/settings/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:blocked/widgets/app_bottom_nav.dart';
 
 import '../../ADs/ad_manager.dart';
 
@@ -165,6 +165,28 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             const Divider(),
+            StreamBuilder<PlayerProgress>(
+              stream: playerProgressStream(),
+              builder: (context, snapshot) {
+                final progress = snapshot.data ??
+                    const PlayerProgress(
+                      totalStars: 0,
+                      levelsSolved: 0,
+                      currentStreak: 0,
+                      bestStreak: 0,
+                    );
+                return ListTile(
+                  leading: const Icon(Icons.bar_chart_rounded),
+                  title: Text(
+                    'Stars ${progress.totalStars} | Solved ${progress.levelsSolved}',
+                  ),
+                  subtitle: Text(
+                    'Streak ${progress.currentStreak} (best ${progress.bestStreak})',
+                  ),
+                );
+              },
+            ),
+            const Divider(),
             // ListTile(
             //   leading: Icon(isMuted ? Icons.volume_up : Icons.volume_off),
             //   title:  Text('Mute Music'),
@@ -210,14 +232,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        // alignment: Alignment.center,
-        child: AdWidget(ad: adManager.getBannerAd()!),
-        width: adManager.getBannerAd()?.size.width.toDouble(),
-        height: adManager.getBannerAd()?.size.height.toDouble(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppBottomNav(current: AppBottomTab.settings),
+        ],
       ),
-
-      ///integration here
     );
   }
 }

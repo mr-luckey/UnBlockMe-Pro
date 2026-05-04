@@ -40,8 +40,7 @@ class _SolutionPageState extends State<SolutionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
+        title: const Text('Auto Solve'),
       ),
       body: BlocProvider(
         create: (context) => LevelBloc(widget.solutionStates.first),
@@ -73,8 +72,9 @@ class _SolutionPageState extends State<SolutionPage> {
                       ),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    spacing: 12,
+                    alignment: WrapAlignment.center,
                     children: [
                       OutlinedButton.icon(
                         icon: const Icon(Icons.refresh),
@@ -87,7 +87,6 @@ class _SolutionPageState extends State<SolutionPage> {
                               }
                             : null,
                       ),
-                      const SizedBox(width: 16),
                       OutlinedButton.icon(
                         icon: Icon(Icons.adaptive.arrow_back),
                         label: const Text('Back'),
@@ -99,7 +98,6 @@ class _SolutionPageState extends State<SolutionPage> {
                               }
                             : null,
                       ),
-                      const SizedBox(width: 16),
                       OutlinedButton.icon(
                         icon: Icon(Icons.adaptive.arrow_forward),
                         label: const Text('Next'),

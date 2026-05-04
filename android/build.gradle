@@ -1,27 +1,3 @@
-buildscript {
-     ext {
-        buildToolsVersion = "31.0.0" 
-        minSdkVersion = 21
-        compileSdkVersion = 31
-        targetSdkVersion = 31
-        androidXCore = "1.6.0"
-        kotlin_version = '1.9.21'}
-    // ext.kotlin_version = '1.9.21'
-    // buildToolsVersion = "31.0.0" 
-            
-    // androidXCore = "1.6.0"
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:7.1.2'
-
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
-
 allprojects {
     repositories {
         google()
@@ -36,16 +12,44 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(':app')
 }
-// subprojects {
-// afterEvaluate { project ->
-//     if (project.plugins.hasPlugin("com.android.application") ||
-//             project.plugins.hasPlugin("com.android.library")) {
-//         project.android {
-//             compileSdkVersion 34
-//             buildToolsVersion "31.0.0"
-//         }
-//     }
-// }}
+
+subprojects {
+    // webview_flutter_android compiles Java with target 17; align Kotlin target.
+    if (project.name == "webview_flutter_android") {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = JavaVersion.VERSION_17.toString()
+            }
+        }
+    }
+
+    // assets_audio_player_web compiles Java with target 1.8; keep Kotlin target aligned.
+    if (project.name == "assets_audio_player_web") {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = JavaVersion.VERSION_1_8.toString()
+            }
+        }
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+            targetCompatibility = JavaVersion.VERSION_1_8.toString()
+        }
+    }
+
+    // assets_audio_player also compiles Java with target 1.8 in its Android module.
+    if (project.name == "assets_audio_player") {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = JavaVersion.VERSION_1_8.toString()
+            }
+        }
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+            targetCompatibility = JavaVersion.VERSION_1_8.toString()
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

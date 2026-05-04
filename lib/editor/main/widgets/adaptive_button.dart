@@ -38,9 +38,15 @@ class AdaptiveTextButton extends StatelessWidget {
         onLongPress: onLongPress,
         onHover: onHover,
         onFocusChange: onFocusChange,
-        style: style,
+        style: style ??
+            TextButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
         focusNode: focusNode,
-        autofocus: autofocus,
+        // autofocus: autofocus,
         clipBehavior: clipBehavior,
         icon: icon,
         label: label,
@@ -52,7 +58,13 @@ class AdaptiveTextButton extends StatelessWidget {
         onLongPress: onLongPress,
         onHover: onHover,
         onFocusChange: onFocusChange,
-        style: style,
+        style: style ??
+            TextButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
         focusNode: focusNode,
         autofocus: autofocus ?? false,
         clipBehavior: clipBehavior ?? Clip.none,

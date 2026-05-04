@@ -5,13 +5,12 @@ import 'package:blocked/level/level.dart';
 import 'package:blocked/level_selection/level_selection.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/puzzle/puzzle.dart';
+import 'package:blocked/progress/progress.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:blocked/settings/settings.dart';
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../ADs/ad_manager.dart';
 
@@ -33,6 +32,59 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
   final NavigatorCubit navigatorCubit;
 
   bool isLoaded;
+
+  Future<bool> _isChapterUnlocked(int chapterIndex) async {
+    if (chapterIndex <= 0) {
+      return true;
+    }
+    final previous = chapters[chapterIndex - 1];
+    for (final level in previous.levels) {
+      final stars = await getLevelStars(level.name);
+      if (stars < 3) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _showNextPackLockedDialog(
+    BuildContext context,
+    int chapterIndex,
+  ) async {
+    if (chapterIndex <= 0) {
+      return;
+    }
+    final previous = chapters[chapterIndex - 1];
+    var totalStars = 0;
+    for (final level in previous.levels) {
+      totalStars += await getLevelStars(level.name);
+    }
+    final requiredStars = previous.levels.length * 3;
+    final remaining = (requiredStars - totalStars).clamp(0, requiredStars);
+    if (!context.mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Next Pack Locked'),
+          content: Text(
+            'Complete previous pack stars first.\n'
+            'Required stars: $requiredStars★\n'
+            'Current stars: $totalStars★\n'
+            'Need $remaining more star${remaining == 1 ? '' : 's'}.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,38 +155,38 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
                                 navigatorCubit.navigateToLevel(
                                     path.chapterName!, nextLevelName);
                               } else {
-                                final nextChapter = chapters
-                                    .skipWhile(
-                                        (c) => c.name != path.chapterName!)
-                                    .skip(1)
-                                    .firstOrNull;
-                                if (nextChapter != null) {
+                                () async {
+                                  final currentChapterIndex = chapters.indexWhere(
+                                    (c) => c.name == path.chapterName!,
+                                  );
+                                  final nextChapterIndex =
+                                      currentChapterIndex + 1;
+                                  if (nextChapterIndex >= chapters.length) {
+                                    navigatorCubit.navigateToLevelSelection(
+                                        path.chapterName!);
+                                    return;
+                                  }
+
+                                  final unlocked =
+                                      await _isChapterUnlocked(nextChapterIndex);
+                                  if (!unlocked) {
+                                    await _showNextPackLockedDialog(
+                                      context,
+                                      nextChapterIndex,
+                                    );
+                                    return;
+                                  }
+
+                                  final nextChapter = chapters[nextChapterIndex];
                                   navigatorCubit.navigateToLevel(
-                                      nextChapter.name,
-                                      nextChapter.levels.first.name);
-                                } else {
-                                  navigatorCubit.navigateToLevelSelection(
-                                      path.chapterName!);
-                                }
+                                    nextChapter.name,
+                                    nextChapter.levels.first.name,
+                                  );
+                                }();
                               }
                             },
                           ),
-                          bottomNavigationBar: adManager.getBannerAd() == null
-                              ? Container(
-                                  // alignment: Alignment.center,
-                                  child: AdWidget(ad: adManager.getBannerAd()!),
-                                  width: adManager
-                                      .getBannerAd()
-                                      ?.size
-                                      .width
-                                      .toDouble(),
-                                  height: adManager
-                                      .getBannerAd()
-                                      ?.size
-                                      .height
-                                      .toDouble(),
-                                )
-                              : SizedBox.shrink(),
+                          bottomNavigationBar: const SizedBox.shrink(),
 
                           ///integrastion herer
                         ),

@@ -3,17 +3,20 @@ part of 'level_bloc.dart';
 class LevelState {
   const LevelState.initial(this.puzzle)
       : latestMove = null,
-        isCompleted = false;
+        isCompleted = false,
+        moves = 0;
 
   const LevelState(
     this.puzzle, {
     required this.latestMove,
     required this.isCompleted,
+    required this.moves,
   });
 
   final PuzzleState puzzle;
   final Move? latestMove;
   final bool isCompleted;
+  final int moves;
 
   int get width => puzzle.width;
   int get height => puzzle.height;
@@ -40,14 +43,17 @@ class LevelState {
     if (isMoveBlockedByWall || cannotBeCut) {
       return [this];
     } else if (isMoveBlockedByControlShift || isMoveFailedControlShift) {
+      final nextMoves = move is Move ? moves : moves + 1;
       return [
         LevelState(
           newPuzzle,
           isCompleted: newPuzzle.isCompleted,
           latestMove: move.blocked(movedBlock),
+          moves: nextMoves,
         )
       ];
     } else {
+      final nextMoves = move is Move ? moves : moves + 1;
       final intermediateState =
           puzzle.getIntermediateStateWithMoveAttempt(move);
       return [
@@ -57,11 +63,13 @@ class LevelState {
             isCompleted: intermediateState.isCompleted,
             latestMove: move.moved(
                 movedBlock), // moved specified to prevent blocked animation
+            moves: nextMoves,
           ),
         LevelState(
           newPuzzle,
           isCompleted: newPuzzle.isCompleted,
           latestMove: move.moved(movedBlock),
+          moves: nextMoves,
         )
       ];
     }

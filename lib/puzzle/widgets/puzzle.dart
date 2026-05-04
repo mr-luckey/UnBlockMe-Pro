@@ -39,6 +39,8 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
     final isCompleted =
         context.select((LevelBloc bloc) => bloc.state.isCompleted);
 
+    final exits = _getExits(board.width, board.height, board.walls);
+
     return RepaintBoundary(
       child: FittedBox(
         child: BlocListener<LevelBloc, LevelState>(
@@ -105,6 +107,20 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                       isSharp: true,
                     ),
                   ),
+                for (var exit in exits)
+                  Positioned(
+                    left: exit.start.x.toWallOffset(),
+                    top: exit.start.y.toWallOffset(),
+                    width: exit.width.toWallSize(),
+                    height: exit.height.toWallSize(),
+                    child: Center(
+                      child: _ExitLabel(
+                        segment: exit,
+                        boardWidth: board.width,
+                        boardHeight: board.height,
+                      ),
+                    ),
+                  ),
                 Positioned.fill(
                   child: AnimatedOpacity(
                     opacity: isCompleted ? 1 : 0,
@@ -133,6 +149,60 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
         ),
       ),
     );
+  }
+}
+
+List<Segment> _getExits(
+  int mapWidth,
+  int mapHeight,
+  Iterable<Segment> wallsToSubtract,
+) {
+  final outerWalls = [
+    Segment.horizontal(y: 0, start: 0, end: mapWidth),
+    Segment.horizontal(y: mapHeight, start: 0, end: mapWidth),
+    Segment.vertical(x: 0, start: 0, end: mapHeight),
+    Segment.vertical(x: mapWidth, start: 0, end: mapHeight),
+  ];
+
+  final exits = <Segment>[];
+  for (final wall in outerWalls) {
+    exits.addAll(wall.subtractAll(wallsToSubtract));
+  }
+  return exits;
+}
+
+class _ExitLabel extends StatelessWidget {
+  const _ExitLabel({
+    required this.segment,
+    required this.boardWidth,
+    required this.boardHeight,
+  });
+
+  final Segment segment;
+  final int boardWidth;
+  final int boardHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final openingLength =
+        max(segment.width.toWallSize(), segment.height.toWallSize());
+    final iconSize = (openingLength * 0.52).clamp(12.0, 26.0);
+
+    final arrow = Icon(
+      Icons.arrow_forward_rounded,
+      size: iconSize,
+      color: Theme.of(context).colorScheme.primary,
+    );
+
+    if (segment.isVertical) {
+      final turn = segment.start.x == boardWidth ? 1 : 3;
+      return RotatedBox(quarterTurns: turn, child: arrow);
+    }
+
+    if (segment.start.y == boardHeight) {
+      return RotatedBox(quarterTurns: 2, child: arrow);
+    }
+    return arrow;
   }
 }
 

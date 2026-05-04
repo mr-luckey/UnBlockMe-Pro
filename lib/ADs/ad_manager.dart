@@ -276,7 +276,8 @@
 //     _rewardedAd?.dispose();
 //   }
 // }
-import 'package:facebook_audience_network/facebook_audience_network.dart';
+// Facebook Audience Network functionality disabled.
+// import 'package:facebook_audience_network/facebook_audience_network.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdManager {
@@ -299,247 +300,95 @@ class AdManager {
     "ca-app-pub-5561438827097019/2510483076",
   ];
 
-  final List<String> facebookBannerAdIds = [
-    "532584862762491_532586772762300",
-    "532584862762491_532587039428940",
-  ];
-
-  final List<String> facebookInterstitialAdIds = [
-    "532584862762491_532587406095570",
-    "532584862762491_532587779428866",
-  ];
-
-  final List<String> facebookRewardedAdIds = [
-    "532584862762491_532589669428677",
-    "532584862762491_532590162761961",
-  ];
-
   int bannerAdIndex = 0;
   int interstitialAdIndex = 0;
   int rewardedAdIndex = 0;
 
-  int facebookBannerAdIndex = 0;
-  int facebookInterstitialAdIndex = 0;
-  int facebookRewardedAdIndex = 0;
-
-  bool _useGoogleAds = true;
-
   void loadBannerAd() {
-    if (_useGoogleAds) {
-      if (bannerAdIndex < googleBannerAdIds.length) {
-        _bannerAd = BannerAd(
-          adUnitId: googleBannerAdIds[bannerAdIndex],
-          size: AdSize.banner,
-          request: const AdRequest(),
-          listener: BannerAdListener(
-            onAdFailedToLoad: (Ad ad, LoadAdError error) {
-              bannerAdIndex++;
-              if (bannerAdIndex >= googleBannerAdIds.length) {
-                _useGoogleAds = false;
-                loadBannerAd();
-              } else {
-                loadBannerAd();
-              }
-            },
-          ),
-        );
+    if (bannerAdIndex < googleBannerAdIds.length) {
+      _bannerAd = BannerAd(
+        adUnitId: googleBannerAdIds[bannerAdIndex],
+        size: AdSize.banner,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdFailedToLoad: (Ad ad, LoadAdError error) {
+            bannerAdIndex++;
+            if (bannerAdIndex < googleBannerAdIds.length) {
+              loadBannerAd();
+            }
+          },
+        ),
+      );
 
-        _bannerAd?.load();
-      } else {
-        loadFacebookBannerAd();
-      }
-    } else {
-      loadFacebookBannerAd();
+      _bannerAd?.load();
     }
   }
 
   void loadInterstitialAd() {
-    if (_useGoogleAds) {
-      if (interstitialAdIndex < googleInterstitialAdIds.length) {
-        InterstitialAd.load(
-          adUnitId: googleInterstitialAdIds[interstitialAdIndex],
-          request: const AdRequest(),
-          adLoadCallback: InterstitialAdLoadCallback(
-            onAdLoaded: (InterstitialAd ad) {
-              _interstitialAd = ad;
-              ad.fullScreenContentCallback = FullScreenContentCallback(
-                onAdDismissedFullScreenContent: (InterstitialAd ad) {
-                  ad.dispose();
-                  loadInterstitialAd();
-                },
-                onAdFailedToShowFullScreenContent:
-                    (InterstitialAd ad, AdError error) {
-                  ad.dispose();
-                  loadInterstitialAd();
-                },
-              );
-            },
-            onAdFailedToLoad: (LoadAdError error) {
-              interstitialAdIndex++;
-              if (interstitialAdIndex >= googleInterstitialAdIds.length) {
-                _useGoogleAds = false;
+    if (interstitialAdIndex < googleInterstitialAdIds.length) {
+      InterstitialAd.load(
+        adUnitId: googleInterstitialAdIds[interstitialAdIndex],
+        request: const AdRequest(),
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (InterstitialAd ad) {
+            _interstitialAd = ad;
+            ad.fullScreenContentCallback = FullScreenContentCallback(
+              onAdDismissedFullScreenContent: (InterstitialAd ad) {
+                ad.dispose();
                 loadInterstitialAd();
-              } else {
+              },
+              onAdFailedToShowFullScreenContent:
+                  (InterstitialAd ad, AdError error) {
+                ad.dispose();
                 loadInterstitialAd();
-              }
-            },
-          ),
-        );
-      } else {
-        loadFacebookInterstitialAd();
-      }
-    } else {
-      loadFacebookInterstitialAd();
+              },
+            );
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            interstitialAdIndex++;
+            if (interstitialAdIndex < googleInterstitialAdIds.length) {
+              loadInterstitialAd();
+            }
+          },
+        ),
+      );
     }
   }
 
   void loadRewardedAd() {
-    if (_useGoogleAds) {
-      if (rewardedAdIndex < googleRewardedAdIds.length) {
-        RewardedAd.load(
-          adUnitId: googleRewardedAdIds[rewardedAdIndex],
-          request: const AdRequest(),
-          rewardedAdLoadCallback: RewardedAdLoadCallback(
-            onAdLoaded: (RewardedAd ad) {
-              _rewardedAd = ad;
-            },
-            onAdFailedToLoad: (LoadAdError error) {
-              rewardedAdIndex++;
-              if (rewardedAdIndex >= googleRewardedAdIds.length) {
-                _useGoogleAds = false;
-                loadRewardedAd();
-              } else {
-                loadRewardedAd();
-              }
-            },
-          ),
-        );
-      } else {
-        loadFacebookRewardedAd();
-      }
-    } else {
-      loadFacebookRewardedAd();
-    }
-  }
-
-  void loadFacebookBannerAd() {
-    if (facebookBannerAdIndex < facebookBannerAdIds.length) {
-      FacebookBannerAd(
-        placementId: facebookBannerAdIds[facebookBannerAdIndex],
-        bannerSize: BannerSize.STANDARD,
-        listener: (result, value) {
-          if (result == BannerAdResult.ERROR) {
-            facebookBannerAdIndex++;
-            if (facebookBannerAdIndex >= facebookBannerAdIds.length) {
-              _useGoogleAds = true;
-              bannerAdIndex = 0;
-              loadBannerAd();
-            } else {
-              loadFacebookBannerAd();
-            }
-          }
-        },
-      );
-    } else {
-      _useGoogleAds = true;
-      bannerAdIndex = 0;
-      loadBannerAd();
-    }
-  }
-
-  void loadFacebookInterstitialAd() {
-    if (facebookInterstitialAdIndex < facebookInterstitialAdIds.length) {
-      FacebookInterstitialAd.loadInterstitialAd(
-        placementId: facebookInterstitialAdIds[facebookInterstitialAdIndex],
-        listener: (result, value) {
-          if (result == InterstitialAdResult.ERROR) {
-            facebookInterstitialAdIndex++;
-            if (facebookInterstitialAdIndex >=
-                facebookInterstitialAdIds.length) {
-              _useGoogleAds = true;
-              interstitialAdIndex = 0;
-              loadInterstitialAd();
-            } else {
-              loadFacebookInterstitialAd();
-            }
-          }
-        },
-      );
-    } else {
-      _useGoogleAds = true;
-      interstitialAdIndex = 0;
-      loadInterstitialAd();
-    }
-  }
-
-  void loadFacebookRewardedAd() {
-    if (facebookRewardedAdIndex < facebookRewardedAdIds.length) {
-      FacebookRewardedVideoAd.loadRewardedVideoAd(
-        placementId: facebookRewardedAdIds[facebookRewardedAdIndex],
-        listener: (result, value) {
-          if (result == RewardedVideoAdResult.ERROR) {
-            facebookRewardedAdIndex++;
-            if (facebookRewardedAdIndex >= facebookRewardedAdIds.length) {
-              _useGoogleAds = true;
-              rewardedAdIndex = 0;
+    if (rewardedAdIndex < googleRewardedAdIds.length) {
+      RewardedAd.load(
+        adUnitId: googleRewardedAdIds[rewardedAdIndex],
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (RewardedAd ad) {
+            _rewardedAd = ad;
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            rewardedAdIndex++;
+            if (rewardedAdIndex < googleRewardedAdIds.length) {
               loadRewardedAd();
-            } else {
-              loadFacebookRewardedAd();
             }
-          }
-        },
+          },
+        ),
       );
-    } else {
-      _useGoogleAds = true;
-      rewardedAdIndex = 0;
-      loadRewardedAd();
     }
   }
 
   void addAds(bool interstitial, bool bannerAd, bool rewardedAd) {
-    if (interstitial) {
-      loadInterstitialAd();
-    }
-
-    if (bannerAd) {
-      loadBannerAd();
-    }
-
-    if (rewardedAd) {
-      loadRewardedAd();
-    }
+    // Ads are disabled by request.
   }
 
   void showInterstitial() {
-    _interstitialAd?.show();
+    // Ads are disabled by request.
   }
 
   BannerAd? getBannerAd() {
-    return _bannerAd;
+    return null;
   }
 
   void showRewardedAd() {
-    if (_rewardedAd != null) {
-      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-        onAdShowedFullScreenContent: (RewardedAd ad) {
-          print("Ad onAdShowedFullScreenContent");
-        },
-        onAdDismissedFullScreenContent: (RewardedAd ad) {
-          ad.dispose();
-          loadRewardedAd();
-        },
-        onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
-          ad.dispose();
-          loadRewardedAd();
-        },
-      );
-
-      _rewardedAd!.setImmersiveMode(true);
-      _rewardedAd!.show(
-          onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-        print("${reward.amount} ${reward.type}");
-      });
-    }
+    // Ads are disabled by request.
   }
 
   void disposeAds() {

@@ -51,25 +51,16 @@ class BoardColorData {
 
   BoardColorData.fromColorScheme(ColorScheme colorScheme)
       : this(
-          block: colorScheme.secondary.blend(colorScheme.background, 80),
-          blockOutline: colorScheme.secondary.blend(colorScheme.background, 40),
-          controlledBlock: colorScheme.brightness == Brightness.dark
-              ? HSVColor.fromColor(colorScheme.primary)
-                  .withSaturation(0.2)
-                  .withValue(0.2)
-                  .toColor()
-              : HSVColor.fromColor(colorScheme.primary)
-                  .withSaturation(0.2)
-                  .withValue(0.9)
-                  .toColor(),
+          block: colorScheme.secondary.blend(colorScheme.background, 70),
+          blockOutline: colorScheme.secondary.blend(colorScheme.background, 30),
+          controlledBlock: HSVColor.fromColor(colorScheme.primary)
+              .withSaturation(0.35)
+              .withValue(0.35)
+              .toColor(),
           controlledBlockOutline: colorScheme.primary,
-          wall: colorScheme.brightness == Brightness.dark
-              ? colorScheme.secondary
-              : colorScheme.secondary.brighten(10),
-          floor: colorScheme.secondary.blend(colorScheme.background, 95),
-          checkmark: colorScheme.brightness == Brightness.dark
-              ? colorScheme.primary
-              : colorScheme.primary.brighten(50),
+          wall: colorScheme.tertiary.blend(colorScheme.background, 40),
+          floor: colorScheme.surface.blend(colorScheme.background, 80),
+          checkmark: colorScheme.primary,
         );
 
   final Color block;

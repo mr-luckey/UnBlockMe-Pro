@@ -1,16 +1,12 @@
-import 'dart:io';
-
 import 'package:async/async.dart';
 // import 'package:blocked/ADs/ad%20helper.dart';
 import 'package:blocked/editor/editor.dart';
 import 'package:blocked/level/level.dart';
-import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../ADs/ad_manager.dart';
@@ -75,18 +71,10 @@ class _BoardControlsState extends State<BoardControls> {
                 return;
               }
               if (!widget.isGenerated) {
-                ScaffoldMessenger.of(context).showMaterialBanner(
-                  MaterialBanner(
-                    content: const Text(
-                        'Solution viewed. Reload level to save progress.'),
-                    actions: [
-                      TextButton(
-                        child: const Text('OK'),
-                        onPressed: () => ScaffoldMessenger.of(context)
-                            .hideCurrentMaterialBanner(
-                                reason: MaterialBannerClosedReason.hide),
-                      ),
-                    ],
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Solution viewed. Reload level to save progress.'),
+                    duration: Duration(seconds: 2),
                   ),
                 );
               }
@@ -114,118 +102,206 @@ class _BoardControlsState extends State<BoardControls> {
       ],
       child: Builder(
         builder: (context) {
-          return IntrinsicHeight(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                PopupMenuButton(
-                  icon: const Icon(Icons.lightbulb_outline_rounded),
-                  tooltip: 'Hint',
-                  onOpened: () {
-                    adManager.showInterstitial();
-                    print("reward ads here");
-                    // AdHelper.showRewardedAd(onComplete: () {
-                    //
-                    // });
-                    /// todo ads integration here
-                  },
-                  itemBuilder: (BuildContext context) => [
-                    const PopupMenuItem(
-                      value: 'show_steps',
-                      child: Text('Show steps'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'play_solution',
-                      child: Text('Play solution'),
-                    ),
-                  ],
-                  onSelected: (String value) {
-                    switch (value) {
-                      case 'show_steps':
-                        // void showRewardAd()
-                        adManager.showInterstitial();
-                        context.read<PuzzleSolverBloc>().add(SolutionViewed());
-                        break;
-                      case 'play_solution':
-                        adManager.showInterstitial();
-
-                        ///todo google ads integration
-                        context.read<PuzzleSolverBloc>().add(SolutionPlayed());
-                        break;
-                    }
-                  },
-                ),
-                const VerticalDivider(),
-                Tooltip(
-                  message: 'Reset (R)',
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Reset'),
-                    onPressed: () {
-                      ///intersatial ads here...
-                      adManager.showInterstitial();
-                      context.read<LevelBloc>().add(const LevelReset());
-                    },
-                  ),
-                ),
-                const Spacer(),
-                if (widget.mapString != null) ...{
-                  Tooltip(
-                    message: 'Copy as YAML',
-                    child: AdaptiveTextButton(
-                      icon: const Icon(MdiIcons.contentCopy),
-                      label: const Text('YAML'),
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                              text: '- name: generated\n'
-                                  '  map: |-\n'
-                                  '${widget.mapString!.split('\n').map((line) => '    $line').join('\n')}'),
-                        );
-                      },
-                    ),
-                  ),
-                  Tooltip(
-                    message: 'Copy shareable link',
-                    child: AdaptiveTextButton(
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(
-                              text:
-                                  'https://slide.jeffsieu.com/#/editor/generated/${encodeMapString(widget.mapString!)}'),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Copied link to clipboard'),
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border.all(color: Theme.of(context).colorScheme.outline),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 520;
+                final baseButtons = [
+                  Expanded(
+                    child: _compactControlButton(
+                      icon: Icons.lightbulb_outline_rounded,
+                      label: 'Hint',
+                      trailing: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.amber,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child:
+                            const Text('10', style: TextStyle(color: Colors.black)),
+                      ),
+                      onPressed: () async {
+                        final selected = await showModalBottomSheet<String>(
+                          context: context,
+                          builder: (sheetContext) => SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.list_alt_rounded),
+                                  title: const Text('Show steps'),
+                                  onTap: () =>
+                                      Navigator.pop(sheetContext, 'show_steps'),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.smart_display_outlined),
+                                  title: const Text('Play solution'),
+                                  onTap: () =>
+                                      Navigator.pop(sheetContext, 'play_solution'),
+                                ),
+                              ],
+                            ),
                           ),
                         );
+                        if (selected == 'show_steps') {
+                          context.read<PuzzleSolverBloc>().add(SolutionViewed());
+                        } else if (selected == 'play_solution') {
+                          context.read<PuzzleSolverBloc>().add(SolutionPlayed());
+                        }
                       },
-                      icon: Icon(Icons.adaptive.share),
-                      label: const Text('Copy link'),
                     ),
                   ),
-                },
-                if (!widget.isGenerated)
-                  AnimatedOpacity(
-                    opacity: isCompleted ? 1.0 : 0.0,
-                    duration: kSlideDuration,
-                    child: Tooltip(
-                      message: 'Next (Enter)',
-                      child: ElevatedButton.icon(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _compactControlButton(
+                      icon: Icons.play_arrow_rounded,
+                      label: 'Auto Solve',
+                      onPressed: () {
+                        context.read<PuzzleSolverBloc>().add(SolutionPlayed());
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _compactControlButton(
+                      icon: Icons.refresh_rounded,
+                      label: 'Reset',
+                      onPressed: () {
+                        context.read<LevelBloc>().add(const LevelReset());
+                      },
+                    ),
+                  ),
+                ];
+
+                if (widget.isGenerated) {
+                  return Column(
+                    children: [
+                      Row(children: baseButtons),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AdaptiveTextButton(
+                              icon: const Icon(MdiIcons.contentCopy),
+                              label: const Text('YAML'),
+                              onPressed: () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text: '- name: generated\n'
+                                        '  map: |-\n'
+                                        '${widget.mapString!.split('\n').map((line) => '    $line').join('\n')}',
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: AdaptiveTextButton(
+                              onPressed: () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text:
+                                        'https://slide.jeffsieu.com/#/editor/generated/${encodeMapString(widget.mapString!)}',
+                                  ),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Copied link to clipboard'),
+                                  ),
+                                );
+                              },
+                              icon: Icon(Icons.adaptive.share),
+                              label: const Text('Copy link'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                if (isNarrow) {
+                  return Column(
+                    children: [
+                      Row(children: baseButtons),
+                      if (isCompleted) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            label: const Text('Next'),
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: () {
+                              context.read<LevelNavigation>().onNext();
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    ...baseButtons,
+                    if (isCompleted) ...[
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
                         label: const Text('Next'),
                         icon: const Icon(Icons.arrow_forward),
                         onPressed: () {
-                          ///intersatial ads here
                           adManager.showInterstitial();
                           context.read<LevelNavigation>().onNext();
                         },
                       ),
-                    ),
-                  ),
-              ],
+                    ],
+                  ],
+                );
+              },
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _compactControlButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Widget? trailing,
+  }) {
+    return SizedBox(
+      height: 50,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              trailing,
+            ],
+          ],
+        ),
       ),
     );
   }

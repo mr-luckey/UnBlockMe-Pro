@@ -2,7 +2,6 @@ import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../ADs/ad_manager.dart';
 
@@ -30,14 +29,6 @@ class GeneratedLevelPage extends StatelessWidget {
         },
         boardControls: BoardControls.generated(mapString),
       ),
-      bottomNavigationBar: Container(
-        // alignment: Alignment.center,
-        child: AdWidget(ad: adManager.getBannerAd()!),
-        width: adManager.getBannerAd()?.size.width.toDouble(),
-        height: adManager.getBannerAd()?.size.height.toDouble(),
-      ),
-
-      ///integration here
     );
   }
 }

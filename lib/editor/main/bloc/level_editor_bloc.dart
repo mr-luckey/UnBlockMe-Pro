@@ -181,6 +181,7 @@ class _InvalidPuzzleState extends LevelState {
           ),
           latestMove: null,
           isCompleted: false,
+          moves: 0,
         );
 }
 
