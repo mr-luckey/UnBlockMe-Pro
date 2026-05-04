@@ -1,4 +1,3 @@
-import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:blocked/main.dart';
 import 'package:blocked/progress/progress.dart';
@@ -51,46 +50,10 @@ class _SettingsPageState extends State<SettingsPage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            ValueListenableBuilder<AdaptiveThemeMode>(
-              valueListenable: AdaptiveTheme.of(context).modeChangeNotifier,
-              builder: (_, mode, child) {
-                return ListTile(
-                  leading: const Icon(Icons.brush_rounded),
-                  title: const Text('Theme'),
-                  subtitle: Text(mode.name),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => SimpleDialog(
-                        title: const Text('Theme'),
-                        children: [
-                          SimpleDialogOption(
-                            child: const Text('System'),
-                            onPressed: () {
-                              AdaptiveTheme.of(context).setSystem();
-                              Navigator.pop(context);
-                            },
-                          ),
-                          SimpleDialogOption(
-                            child: const Text('Light'),
-                            onPressed: () {
-                              AdaptiveTheme.of(context).setLight();
-                              Navigator.pop(context);
-                            },
-                          ),
-                          SimpleDialogOption(
-                            child: const Text('Dark'),
-                            onPressed: () {
-                              AdaptiveTheme.of(context).setDark();
-                              Navigator.pop(context);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
+            const ListTile(
+              leading: Icon(Icons.dark_mode_rounded),
+              title: Text('Theme'),
+              subtitle: Text('Dark (fixed)'),
             ),
             const ListTile(
               title: Text('Color'),

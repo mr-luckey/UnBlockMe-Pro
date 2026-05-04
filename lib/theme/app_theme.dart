@@ -17,15 +17,31 @@ class AppThemeTokens {
   static const Color border = Color(0xFF2D2D50);
 }
 
-ThemeData createBlockedTheme(Brightness brightness) {
+ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
   final isDark = brightness == Brightness.dark;
+  final accentHsl = HSLColor.fromColor(accent);
+  final secondary = accentHsl.withHue((accentHsl.hue + 32) % 360).toColor();
+  final tertiary = accentHsl.withHue((accentHsl.hue + 168) % 360).toColor();
+  final card = accentHsl
+      .withSaturation((accentHsl.saturation * 0.25).clamp(0.05, 0.35))
+      .withLightness(isDark ? 0.14 : 0.96)
+      .toColor();
+  final card2 = accentHsl
+      .withSaturation((accentHsl.saturation * 0.35).clamp(0.08, 0.45))
+      .withLightness(isDark ? 0.19 : 0.92)
+      .toColor();
+  final border = accentHsl
+      .withSaturation((accentHsl.saturation * 0.45).clamp(0.1, 0.55))
+      .withLightness(isDark ? 0.34 : 0.75)
+      .toColor();
+
   final scheme = ColorScheme(
     brightness: brightness,
-    primary: AppThemeTokens.accentPink,
+    primary: accent,
     onPrimary: Colors.white,
-    secondary: AppThemeTokens.accentPurple,
+    secondary: secondary,
     onSecondary: Colors.white,
-    tertiary: AppThemeTokens.accentCyan,
+    tertiary: tertiary,
     onTertiary: Colors.black,
     error: AppThemeTokens.error,
     onError: Colors.white,
@@ -110,11 +126,11 @@ ThemeData createBlockedTheme(Brightness brightness) {
     scaffoldBackgroundColor: scheme.background,
     textTheme: textTheme,
     cardTheme: CardThemeData(
-      color: AppThemeTokens.card,
+      color: card,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppThemeTokens.border),
+        side: BorderSide(color: border),
       ),
     ),
     appBarTheme: const AppBarTheme(
@@ -126,7 +142,7 @@ ThemeData createBlockedTheme(Brightness brightness) {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        backgroundColor: AppThemeTokens.accentPink,
+        backgroundColor: scheme.primary,
         foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
@@ -134,8 +150,8 @@ ThemeData createBlockedTheme(Brightness brightness) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        side: const BorderSide(color: AppThemeTokens.border),
-        backgroundColor: AppThemeTokens.card,
+        side: BorderSide(color: border),
+        backgroundColor: card,
         foregroundColor: AppThemeTokens.text,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
@@ -143,20 +159,20 @@ ThemeData createBlockedTheme(Brightness brightness) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        foregroundColor: AppThemeTokens.accentCyan,
+        foregroundColor: scheme.tertiary,
       ),
     ),
-    dividerTheme: const DividerThemeData(color: AppThemeTokens.border),
+    dividerTheme: DividerThemeData(color: border),
     chipTheme: ChipThemeData(
-      backgroundColor: AppThemeTokens.card2,
+      backgroundColor: card2,
       labelStyle: const TextStyle(color: AppThemeTokens.text),
-      side: const BorderSide(color: AppThemeTokens.border),
+      side: BorderSide(color: border),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
     ),
-    snackBarTheme: const SnackBarThemeData(
+    snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: AppThemeTokens.card2,
-      contentTextStyle: TextStyle(color: AppThemeTokens.text),
+      backgroundColor: card2,
+      contentTextStyle: const TextStyle(color: AppThemeTokens.text),
     ),
   );
 }

@@ -16,31 +16,25 @@ void main() async {
   // FacebookAudienceNetwork.init();
   await MobileAds.instance.initialize();
   final levels = await readLevelsFromYaml();
-  final savedThemeMode = await AdaptiveTheme.getThemeMode();
   final savedThemeColor = await getSavedColor();
   runApp(BlockedApp(
     chapters: levels,
-    savedThemeMode: savedThemeMode,
     savedThemeColor: savedThemeColor,
   ));
 }
 
 ThemeData createThemeWithBrightness(Color _primary, Brightness brightness) {
-  // The redesign uses a fixed default palette; color pickers are retained
-  // to avoid breaking existing settings flow.
-  return createBlockedTheme(brightness);
+  return createBlockedTheme(brightness, accent: _primary);
 }
 
 class BlockedApp extends StatefulWidget {
   const BlockedApp({
     Key? key,
     required this.chapters,
-    required this.savedThemeMode,
     required this.savedThemeColor,
   }) : super(key: key);
 
   final List<LevelChapter> chapters;
-  final AdaptiveThemeMode? savedThemeMode;
   final Color? savedThemeColor;
 
   @override
@@ -62,7 +56,7 @@ class _BlockedAppState extends State<BlockedApp> {
           return AdaptiveTheme(
             light: createThemeWithBrightness(state.color, Brightness.light),
             dark: createThemeWithBrightness(state.color, Brightness.dark),
-            initial: widget.savedThemeMode ?? AdaptiveThemeMode.system,
+            initial: AdaptiveThemeMode.dark,
             builder: (theme, darkTheme) =>
                 BlocListener<ThemeColorBloc, ThemeColorState>(
               listenWhen: (previous, current) =>
