@@ -8,13 +8,13 @@ import 'package:blocked/theme/theme.dart';
 // import 'package:facebook_audience_network/facebook_audience_network.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-// import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AdManager();
   // FacebookAudienceNetwork.init();
-  // MobileAds.instance.initialize();
+  await MobileAds.instance.initialize();
   final levels = await readLevelsFromYaml();
   final savedThemeMode = await AdaptiveTheme.getThemeMode();
   final savedThemeColor = await getSavedColor();

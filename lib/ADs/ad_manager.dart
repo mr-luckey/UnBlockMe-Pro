@@ -276,14 +276,17 @@
 //     _rewardedAd?.dispose();
 //   }
 // }
-// Facebook Audience Network functionality disabled.
-// import 'package:facebook_audience_network/facebook_audience_network.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+enum RewardPlacement { hint, autoSolve }
 
 class AdManager {
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
-  RewardedAd? _rewardedAd;
+  final Map<RewardPlacement, RewardedAd?> _rewardedAds = {
+    RewardPlacement.hint: null,
+    RewardPlacement.autoSolve: null,
+  };
 
   final List<String> googleBannerAdIds = [
     "ca-app-pub-5561438827097019/5440263702",
@@ -295,14 +298,18 @@ class AdManager {
     "ca-app-pub-5561438827097019/1767777858",
   ];
 
-  final List<String> googleRewardedAdIds = [
-    "ca-app-pub-5561438827097019/3823564740",
-    "ca-app-pub-5561438827097019/2510483076",
+  // Example rewarded ad IDs for quick testing; replace later with your own IDs.
+  final List<String> hintRewardedAdIds = [
+    "ca-app-pub-3940256099942544/5224354917",
+  ];
+  final List<String> autoSolveRewardedAdIds = [
+    "ca-app-pub-3940256099942544/5224354917",
   ];
 
   int bannerAdIndex = 0;
   int interstitialAdIndex = 0;
-  int rewardedAdIndex = 0;
+  int hintRewardedAdIndex = 0;
+  int autoSolveRewardedAdIndex = 0;
 
   void loadBannerAd() {
     if (bannerAdIndex < googleBannerAdIds.length) {
@@ -355,20 +362,30 @@ class AdManager {
     }
   }
 
-  void loadRewardedAd() {
-    if (rewardedAdIndex < googleRewardedAdIds.length) {
+  void _loadRewardedAd(RewardPlacement placement) {
+    final ids = placement == RewardPlacement.hint
+        ? hintRewardedAdIds
+        : autoSolveRewardedAdIds;
+    final currentIndex = placement == RewardPlacement.hint
+        ? hintRewardedAdIndex
+        : autoSolveRewardedAdIndex;
+
+    if (currentIndex < ids.length) {
       RewardedAd.load(
-        adUnitId: googleRewardedAdIds[rewardedAdIndex],
+        adUnitId: ids[currentIndex],
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (RewardedAd ad) {
-            _rewardedAd = ad;
+            _rewardedAds[placement]?.dispose();
+            _rewardedAds[placement] = ad;
           },
           onAdFailedToLoad: (LoadAdError error) {
-            rewardedAdIndex++;
-            if (rewardedAdIndex < googleRewardedAdIds.length) {
-              loadRewardedAd();
+            if (placement == RewardPlacement.hint) {
+              hintRewardedAdIndex++;
+            } else {
+              autoSolveRewardedAdIndex++;
             }
+            _loadRewardedAd(placement);
           },
         ),
       );
@@ -376,24 +393,79 @@ class AdManager {
   }
 
   void addAds(bool interstitial, bool bannerAd, bool rewardedAd) {
-    // Ads are disabled by request.
+    if (interstitial) {
+      loadInterstitialAd();
+    }
+    if (bannerAd) {
+      loadBannerAd();
+    }
+    if (rewardedAd) {
+      prefetchRewardedAds();
+    }
   }
 
   void showInterstitial() {
-    // Ads are disabled by request.
+    _interstitialAd?.show();
   }
 
   BannerAd? getBannerAd() {
-    return null;
+    return _bannerAd;
+  }
+
+  void prefetchRewardedAds() {
+    if (_rewardedAds[RewardPlacement.hint] == null) {
+      _loadRewardedAd(RewardPlacement.hint);
+    }
+    if (_rewardedAds[RewardPlacement.autoSolve] == null) {
+      _loadRewardedAd(RewardPlacement.autoSolve);
+    }
+  }
+
+  Future<bool> showRewardedAdForPlacement(
+    RewardPlacement placement, {
+    required void Function() onRewardEarned,
+  }) async {
+    final ad = _rewardedAds[placement];
+    if (ad == null) {
+      _loadRewardedAd(placement);
+      return false;
+    }
+
+    var rewarded = false;
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAds[placement] = null;
+        _loadRewardedAd(placement);
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAds[placement] = null;
+        _loadRewardedAd(placement);
+      },
+    );
+    ad.setImmersiveMode(true);
+    await ad.show(
+      onUserEarnedReward: (adWithoutView, reward) {
+        rewarded = true;
+        onRewardEarned();
+      },
+    );
+    return rewarded;
   }
 
   void showRewardedAd() {
-    // Ads are disabled by request.
+    showRewardedAdForPlacement(
+      RewardPlacement.hint,
+      onRewardEarned: () {},
+    );
   }
 
   void disposeAds() {
     _bannerAd?.dispose();
     _interstitialAd?.dispose();
-    _rewardedAd?.dispose();
+    for (final ad in _rewardedAds.values) {
+      ad?.dispose();
+    }
   }
 }

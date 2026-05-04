@@ -31,7 +31,7 @@ class _BoardControlsState extends State<BoardControls> {
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, false);
+    adManager.addAds(true, true, true);
   }
 
   @override
@@ -73,7 +73,8 @@ class _BoardControlsState extends State<BoardControls> {
               if (!widget.isGenerated) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Solution viewed. Reload level to save progress.'),
+                    content:
+                        Text('Solution viewed. Reload level to save progress.'),
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -118,42 +119,42 @@ class _BoardControlsState extends State<BoardControls> {
                       icon: Icons.lightbulb_outline_rounded,
                       label: 'Hint',
                       trailing: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.amber,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child:
-                            const Text('10', style: TextStyle(color: Colors.black)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.ondemand_video_rounded,
+                                size: 10, color: Colors.black),
+                            // SizedBox(width: 3),
+                            // Text('Ad 15s',
+                            //     style: TextStyle(color: Colors.black)),
+                          ],
+                        ),
                       ),
                       onPressed: () async {
-                        final selected = await showModalBottomSheet<String>(
-                          context: context,
-                          builder: (sheetContext) => SafeArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ListTile(
-                                  leading: const Icon(Icons.list_alt_rounded),
-                                  title: const Text('Show steps'),
-                                  onTap: () =>
-                                      Navigator.pop(sheetContext, 'show_steps'),
-                                ),
-                                ListTile(
-                                  leading: const Icon(Icons.smart_display_outlined),
-                                  title: const Text('Play solution'),
-                                  onTap: () =>
-                                      Navigator.pop(sheetContext, 'play_solution'),
-                                ),
-                              ],
-                            ),
-                          ),
+                        final rewarded =
+                            await adManager.showRewardedAdForPlacement(
+                          RewardPlacement.hint,
+                          onRewardEarned: () {
+                            context
+                                .read<PuzzleSolverBloc>()
+                                .add(SolutionViewed());
+                          },
                         );
-                        if (selected == 'show_steps') {
-                          context.read<PuzzleSolverBloc>().add(SolutionViewed());
-                        } else if (selected == 'play_solution') {
-                          context.read<PuzzleSolverBloc>().add(SolutionPlayed());
+                        if (!rewarded && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Hint ad is loading. Please try again in a moment.',
+                              ),
+                            ),
+                          );
+                          adManager.prefetchRewardedAds();
                         }
                       },
                     ),
@@ -163,8 +164,47 @@ class _BoardControlsState extends State<BoardControls> {
                     child: _compactControlButton(
                       icon: Icons.play_arrow_rounded,
                       label: 'Auto Solve',
-                      onPressed: () {
-                        context.read<PuzzleSolverBloc>().add(SolutionPlayed());
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orangeAccent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.ondemand_video_rounded,
+                                size: 10, color: Colors.black),
+                            // SizedBox(width: 3),
+                            // Text('Ad 60s',
+                            //     style: TextStyle(
+                            //         color: Colors.black, fontSize: 5)),
+                          ],
+                        ),
+                      ),
+                      onPressed: () async {
+                        final rewarded =
+                            await adManager.showRewardedAdForPlacement(
+                          RewardPlacement.autoSolve,
+                          onRewardEarned: () {
+                            context
+                                .read<PuzzleSolverBloc>()
+                                .add(SolutionPlayed());
+                          },
+                        );
+                        if (!rewarded && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Auto-solve ad is loading. Please try again in a moment.',
+                              ),
+                            ),
+                          );
+                          adManager.prefetchRewardedAds();
+                        }
                       },
                     ),
                   ),
