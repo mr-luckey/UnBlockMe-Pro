@@ -5,6 +5,7 @@ import 'package:blocked/models/models.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:blocked/settings/settings.dart';
 import 'package:blocked/theme/theme.dart';
+import 'package:blocked/theme/theme_presets.dart';
 // import 'package:facebook_audience_network/facebook_audience_network.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -49,7 +50,7 @@ class _BlockedAppState extends State<BlockedApp> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) =>
-          ThemeColorBloc(widget.savedThemeColor ?? Colors.green),
+          ThemeColorBloc(widget.savedThemeColor ?? ThemePresets.all.first.primary),
       child: BlocBuilder<ThemeColorBloc, ThemeColorState>(
         buildWhen: (previous, current) => previous.color != current.color,
         builder: (context, state) {

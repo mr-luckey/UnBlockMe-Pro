@@ -126,7 +126,7 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                     opacity: isCompleted ? 1 : 0,
                     duration: kSlideDuration,
                     child: Container(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.scrim.withOpacity(0.5),
                       child: AnimatedScale(
                         scale: isCompleted ? 1 : 0,
                         duration: kSlideDuration * 5,

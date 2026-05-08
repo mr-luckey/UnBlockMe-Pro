@@ -71,7 +71,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     return Scaffold(
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -120,7 +122,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 icon: Icons.local_fire_department_rounded,
                                 label: 'Streak',
                                 value: '${progress.currentStreak}',
-                                tint: const Color(0xFF3A130F),
+                                tint: scheme.primaryContainer,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -129,7 +131,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 icon: Icons.emoji_events_rounded,
                                 label: 'Solved',
                                 value: '${progress.levelsSolved}',
-                                tint: const Color(0xFF1C2208),
+                                tint: scheme.secondaryContainer,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -138,7 +140,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 icon: Icons.star_rounded,
                                 label: 'Stars',
                                 value: '${progress.totalStars}',
-                                tint: const Color(0xFF071D2C),
+                                tint: scheme.tertiaryContainer,
                               ),
                             ),
                           ],
@@ -271,8 +273,11 @@ class _ContinueCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF220126), Color(0xFF2C022A)],
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primaryContainer,
+            Theme.of(context).colorScheme.secondaryContainer,
+          ],
         ),
         border: Border.all(color: Theme.of(context).colorScheme.primary),
       ),
@@ -342,12 +347,15 @@ class _OverallProgressCard extends StatelessWidget {
                   height: 34,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF9B5DFF), Color(0xFFFF2D78)],
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.secondary,
+                        Theme.of(context).colorScheme.tertiary,
+                      ],
                     ),
                   ),
-                  child: const Icon(Icons.sports_esports,
-                      color: Colors.black87, size: 30),
+                  child: Icon(Icons.sports_esports,
+                      color: Theme.of(context).colorScheme.onPrimary, size: 30),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

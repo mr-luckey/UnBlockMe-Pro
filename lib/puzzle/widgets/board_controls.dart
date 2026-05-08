@@ -122,14 +122,16 @@ class _BoardControlsState extends State<BoardControls> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.amber,
+                          color: Theme.of(context).colorScheme.tertiaryContainer,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.ondemand_video_rounded,
-                                size: 10, color: Colors.black),
+                                size: 10,
+                                color:
+                                    Theme.of(context).colorScheme.onTertiaryContainer),
                             // SizedBox(width: 3),
                             // Text('Ad 15s',
                             //     style: TextStyle(color: Colors.black)),
@@ -159,14 +161,17 @@ class _BoardControlsState extends State<BoardControls> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.orangeAccent,
+                          color:
+                              Theme.of(context).colorScheme.secondaryContainer,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.ondemand_video_rounded,
-                                size: 10, color: Colors.black),
+                                size: 10,
+                                color:
+                                    Theme.of(context).colorScheme.onSecondaryContainer),
                             // SizedBox(width: 3),
                             // Text('Ad 60s',
                             //     style: TextStyle(
@@ -335,7 +340,7 @@ class _BoardControlsState extends State<BoardControls> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black54,
+      barrierColor: Theme.of(context).colorScheme.scrim.withOpacity(0.54),
       builder: (dialogContext) => const _AdLoadingDialog(),
     );
 
@@ -370,7 +375,7 @@ class _AdLoadingDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Dialog(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0),
       elevation: 0,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),

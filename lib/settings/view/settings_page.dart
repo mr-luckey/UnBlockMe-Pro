@@ -3,6 +3,7 @@ import 'package:blocked/main.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/settings/settings.dart';
+import 'package:blocked/theme/theme_presets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:blocked/widgets/app_bottom_nav.dart';
@@ -11,16 +12,6 @@ import '../../ADs/ad_manager.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
-
-  static const List<Color> colors = [
-    Colors.red,
-    Colors.orange,
-    Colors.yellow,
-    Colors.green,
-    Colors.blue,
-    Colors.indigo,
-    Colors.purple,
-  ];
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -70,58 +61,62 @@ class _SettingsPageState extends State<SettingsPage> {
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
               ),
-              itemCount: SettingsPage.colors.length,
+              itemCount: ThemePresets.all.length,
               itemBuilder: (context, index) {
-                final color = SettingsPage.colors[index];
+                final preset = ThemePresets.all[index];
+                final color = preset.primary;
 
                 return Builder(builder: (context) {
                   final isSelected = context.select((ThemeColorBloc bloc) =>
                       bloc.state.color.value == color.value);
-                  return OutlinedButton(
-                    onPressed: () {
-                      /// todo ads integraation here
-                      context
-                          .read<ThemeColorBloc>()
-                          .add(ThemeColorChanged(SettingsPage.colors[index]));
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16.0, horizontal: 8.0),
-                    ),
-                    child: Stack(
-                      alignment: AlignmentDirectional.bottomEnd,
-                      children: [
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: BoardColor(
-                              data: BoardColorData.fromColorScheme(
-                                  createThemeWithBrightness(
-                                          color, Theme.of(context).brightness)
-                                      .colorScheme),
-                              child: const ThemeColorPreview(),
-                            ),
-                          ),
-                        ),
-                        if (isSelected)
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 2.0,
-                              ),
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(16.0),
-                            ),
-                            child: const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.check,
-                                size: 32.0,
+                  return Tooltip(
+                    message: preset.name,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        /// todo ads integraation here
+                        context
+                            .read<ThemeColorBloc>()
+                            .add(ThemeColorChanged(color));
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16.0, horizontal: 8.0),
+                      ),
+                      child: Stack(
+                        alignment: AlignmentDirectional.bottomEnd,
+                        children: [
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: BoardColor(
+                                data: BoardColorData.fromColorScheme(
+                                    createThemeWithBrightness(
+                                            color, Theme.of(context).brightness)
+                                        .colorScheme),
+                                child: const ThemeColorPreview(),
                               ),
                             ),
                           ),
-                      ],
+                          if (isSelected)
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 2.0,
+                                ),
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(16.0),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Icon(
+                                  Icons.check,
+                                  size: 32.0,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 });

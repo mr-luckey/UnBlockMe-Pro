@@ -97,10 +97,13 @@ class LabeledPuzzleButton extends StatelessWidget {
               ),
             ),
           if (isLocked)
-            const Positioned(
+            Positioned(
               top: 8,
               right: 8,
-              child: Icon(Icons.lock, color: Colors.amber),
+              child: Icon(
+                Icons.lock,
+                color: Theme.of(context).colorScheme.tertiary,
+              ),
             ),
         ],
       ),

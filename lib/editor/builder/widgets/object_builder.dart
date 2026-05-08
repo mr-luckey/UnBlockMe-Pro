@@ -90,7 +90,7 @@ class ObjectBuilder extends StatelessWidget {
                 children: [
                   Positioned.fill(
                       child: Ink(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.scrim.withOpacity(0.1),
                   )),
                   hintBuilder(start, end) ?? Container(),
                 ],

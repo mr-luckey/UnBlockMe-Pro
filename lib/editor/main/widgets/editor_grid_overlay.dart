@@ -4,11 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class EditorGridOverlay extends StatelessWidget {
-  const EditorGridOverlay(
-      {Key? key, this.color = const Color(0x66777777), this.child})
-      : super(key: key);
+  const EditorGridOverlay({Key? key, this.color, this.child}) : super(key: key);
 
-  final Color color;
+  final Color? color;
   final Widget? child;
 
   @override
@@ -16,7 +14,9 @@ class EditorGridOverlay extends StatelessWidget {
     return RepaintBoundary(
       child: CustomPaint(
         willChange: false,
-        foregroundPainter: _GridOverlayPainter(color),
+        foregroundPainter: _GridOverlayPainter(
+          color ?? Theme.of(context).colorScheme.outline.withOpacity(0.4),
+        ),
         child: child,
       ),
     );

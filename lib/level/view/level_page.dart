@@ -275,7 +275,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
         final theme = Theme.of(dialogContext);
         final isPerfect = stars == 3;
         return Dialog(
-          backgroundColor: Colors.transparent,
+          backgroundColor: theme.colorScheme.surface.withOpacity(0),
           insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 430),
@@ -286,9 +286,9 @@ class _LevelPageViewState extends State<_LevelPageView> {
               border: Border.all(
                 color: theme.colorScheme.outline.withValues(alpha: 0.45),
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x6A000000),
+                  color: theme.colorScheme.shadow.withOpacity(0.42),
                   blurRadius: 34,
                   offset: Offset(0, 14),
                 ),
@@ -325,7 +325,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
                         Icons.star_rounded,
                         size: 42,
                         color: index < stars
-                            ? const Color(0xFFFFC42E)
+                            ? theme.colorScheme.tertiary
                             : theme.colorScheme.outline.withValues(alpha: 0.35),
                       ),
                     ),
@@ -336,7 +336,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
                   isPerfect ? 'Excellent!' : 'Completed!',
                   style: theme.textTheme.displaySmall?.copyWith(
                     color: isPerfect
-                        ? const Color(0xFFFFC42E)
+                        ? theme.colorScheme.tertiary
                         : theme.colorScheme.primary,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,

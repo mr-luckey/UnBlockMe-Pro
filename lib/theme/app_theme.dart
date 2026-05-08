@@ -1,60 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-class AppThemeTokens {
-  static const Color bg = Color(0xFF0A101C);
-  static const Color surf = Color(0xFF121A2A);
-  static const Color card = Color(0xFF162236);
-  static const Color card2 = Color(0xFF1D2C45);
-  static const Color accentPink = Color(0xFFFF4D8D);
-  static const Color accentPurple = Color(0xFF7D8CFF);
-  static const Color accentCyan = Color(0xFF42C8FF);
-  static const Color success = Color(0xFF00E5B0);
-  static const Color warning = Color(0xFFFFB800);
-  static const Color error = Color(0xFFFF4444);
-  static const Color text = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFB8C4DE);
-  static const Color border = Color(0xFF355073);
-}
+import 'theme_presets.dart';
 
 ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
+  const appError = Color(0xFFFF5252);
   final isDark = brightness == Brightness.dark;
-  final accentHsl = HSLColor.fromColor(accent);
-  final secondary = accentHsl
-      .withHue((accentHsl.hue + 28) % 360)
-      .withSaturation((accentHsl.saturation * 0.9).clamp(0.45, 0.9))
-      .toColor();
-  final tertiary = accentHsl
-      .withHue((accentHsl.hue + 190) % 360)
-      .withSaturation((accentHsl.saturation * 0.75).clamp(0.4, 0.85))
-      .toColor();
-  final card = accentHsl
-      .withSaturation((accentHsl.saturation * 0.3).clamp(0.08, 0.38))
-      .withLightness(isDark ? 0.2 : 0.96)
-      .toColor();
-  final card2 = accentHsl
-      .withSaturation((accentHsl.saturation * 0.4).clamp(0.12, 0.5))
-      .withLightness(isDark ? 0.26 : 0.92)
-      .toColor();
-  final border = accentHsl
-      .withSaturation((accentHsl.saturation * 0.42).clamp(0.15, 0.6))
-      .withLightness(isDark ? 0.44 : 0.75)
-      .toColor();
+  final preset = ThemePresets.resolveByColor(accent);
+  final card = isDark ? preset.darkCard : preset.lightCard;
+  final card2 = isDark ? preset.darkCard2 : preset.lightCard2;
+  final border = isDark ? preset.darkBorder : preset.lightBorder;
+  final onSurface = isDark ? preset.darkOnSurface : preset.lightOnSurface;
 
   final scheme = ColorScheme(
     brightness: brightness,
-    primary: accent,
-    onPrimary: Colors.black,
-    secondary: secondary,
-    onSecondary: Colors.black,
-    tertiary: tertiary,
-    onTertiary: Colors.black,
-    error: AppThemeTokens.error,
+    primary: preset.primary,
+    onPrimary: preset.onPrimary,
+    secondary: preset.secondary,
+    onSecondary: preset.onSecondary,
+    tertiary: preset.tertiary,
+    onTertiary: preset.onTertiary,
+    error: appError,
     onError: Colors.white,
-    surface: isDark ? AppThemeTokens.surf : const Color(0xFFF3F6FB),
-    onSurface: isDark ? AppThemeTokens.text : const Color(0xFF101828),
-    background: isDark ? AppThemeTokens.bg : const Color(0xFFEAF0F8),
-    onBackground: isDark ? AppThemeTokens.text : const Color(0xFF101828),
+    surface: isDark ? preset.darkSurface : preset.lightSurface,
+    onSurface: onSurface,
+    background: isDark ? preset.darkBackground : preset.lightBackground,
+    onBackground: onSurface,
   );
 
   final baseText = GoogleFonts.dmSansTextTheme(
@@ -139,9 +109,9 @@ ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
         side: BorderSide(color: border),
       ),
     ),
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
-      foregroundColor: AppThemeTokens.text,
+      foregroundColor: scheme.onSurface,
       elevation: 0,
       centerTitle: false,
     ),
@@ -171,14 +141,19 @@ ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
     dividerTheme: DividerThemeData(color: border),
     chipTheme: ChipThemeData(
       backgroundColor: card2,
-      labelStyle: const TextStyle(color: AppThemeTokens.text),
+      labelStyle: TextStyle(color: onSurface),
       side: BorderSide(color: border),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: card2,
-      contentTextStyle: const TextStyle(color: AppThemeTokens.text),
+      contentTextStyle: TextStyle(color: onSurface),
+    ),
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: scheme.primary,
+      selectionColor: scheme.primary.withOpacity(0.28),
+      selectionHandleColor: scheme.primary,
     ),
   );
 }
