@@ -2,53 +2,59 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppThemeTokens {
-  static const Color bg = Color(0xFF06060F);
-  static const Color surf = Color(0xFF0F0F1E);
-  static const Color card = Color(0xFF13132B);
-  static const Color card2 = Color(0xFF1A1A38);
-  static const Color accentPink = Color(0xFFFF2D78);
-  static const Color accentPurple = Color(0xFF9B5DFF);
-  static const Color accentCyan = Color(0xFF00E5FF);
+  static const Color bg = Color(0xFF0A101C);
+  static const Color surf = Color(0xFF121A2A);
+  static const Color card = Color(0xFF162236);
+  static const Color card2 = Color(0xFF1D2C45);
+  static const Color accentPink = Color(0xFFFF4D8D);
+  static const Color accentPurple = Color(0xFF7D8CFF);
+  static const Color accentCyan = Color(0xFF42C8FF);
   static const Color success = Color(0xFF00E5B0);
   static const Color warning = Color(0xFFFFB800);
   static const Color error = Color(0xFFFF4444);
   static const Color text = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF8080A0);
-  static const Color border = Color(0xFF2D2D50);
+  static const Color textSecondary = Color(0xFFB8C4DE);
+  static const Color border = Color(0xFF355073);
 }
 
 ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
   final isDark = brightness == Brightness.dark;
   final accentHsl = HSLColor.fromColor(accent);
-  final secondary = accentHsl.withHue((accentHsl.hue + 32) % 360).toColor();
-  final tertiary = accentHsl.withHue((accentHsl.hue + 168) % 360).toColor();
+  final secondary = accentHsl
+      .withHue((accentHsl.hue + 28) % 360)
+      .withSaturation((accentHsl.saturation * 0.9).clamp(0.45, 0.9))
+      .toColor();
+  final tertiary = accentHsl
+      .withHue((accentHsl.hue + 190) % 360)
+      .withSaturation((accentHsl.saturation * 0.75).clamp(0.4, 0.85))
+      .toColor();
   final card = accentHsl
-      .withSaturation((accentHsl.saturation * 0.25).clamp(0.05, 0.35))
-      .withLightness(isDark ? 0.14 : 0.96)
+      .withSaturation((accentHsl.saturation * 0.3).clamp(0.08, 0.38))
+      .withLightness(isDark ? 0.2 : 0.96)
       .toColor();
   final card2 = accentHsl
-      .withSaturation((accentHsl.saturation * 0.35).clamp(0.08, 0.45))
-      .withLightness(isDark ? 0.19 : 0.92)
+      .withSaturation((accentHsl.saturation * 0.4).clamp(0.12, 0.5))
+      .withLightness(isDark ? 0.26 : 0.92)
       .toColor();
   final border = accentHsl
-      .withSaturation((accentHsl.saturation * 0.45).clamp(0.1, 0.55))
-      .withLightness(isDark ? 0.34 : 0.75)
+      .withSaturation((accentHsl.saturation * 0.42).clamp(0.15, 0.6))
+      .withLightness(isDark ? 0.44 : 0.75)
       .toColor();
 
   final scheme = ColorScheme(
     brightness: brightness,
     primary: accent,
-    onPrimary: Colors.white,
+    onPrimary: Colors.black,
     secondary: secondary,
-    onSecondary: Colors.white,
+    onSecondary: Colors.black,
     tertiary: tertiary,
     onTertiary: Colors.black,
     error: AppThemeTokens.error,
     onError: Colors.white,
-    surface: isDark ? AppThemeTokens.surf : const Color(0xFFF5F3FF),
-    onSurface: isDark ? AppThemeTokens.text : const Color(0xFF151226),
-    background: isDark ? AppThemeTokens.bg : const Color(0xFFEDEAFD),
-    onBackground: isDark ? AppThemeTokens.text : const Color(0xFF151226),
+    surface: isDark ? AppThemeTokens.surf : const Color(0xFFF3F6FB),
+    onSurface: isDark ? AppThemeTokens.text : const Color(0xFF101828),
+    background: isDark ? AppThemeTokens.bg : const Color(0xFFEAF0F8),
+    onBackground: isDark ? AppThemeTokens.text : const Color(0xFF101828),
   );
 
   final baseText = GoogleFonts.dmSansTextTheme(
@@ -143,7 +149,7 @@ ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         backgroundColor: scheme.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -152,7 +158,7 @@ ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         side: BorderSide(color: border),
         backgroundColor: card,
-        foregroundColor: AppThemeTokens.text,
+        foregroundColor: scheme.onSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),

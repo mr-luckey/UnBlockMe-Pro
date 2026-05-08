@@ -276,9 +276,12 @@
 //     _rewardedAd?.dispose();
 //   }
 // }
+import 'dart:async';
+
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum RewardPlacement { hint, autoSolve }
+enum RewardShowResult { notReady, shown }
 
 class AdManager {
   BannerAd? _bannerAd;
@@ -323,6 +326,14 @@ class AdManager {
   int interstitialAdIndex = 0;
   int hintRewardedAdIndex = 0;
   int autoSolveRewardedAdIndex = 0;
+  final Map<RewardPlacement, bool> _isRewardLoadInProgress = {
+    RewardPlacement.hint: false,
+    RewardPlacement.autoSolve: false,
+  };
+  final Map<RewardPlacement, Completer<void>?> _rewardReadyCompleter = {
+    RewardPlacement.hint: null,
+    RewardPlacement.autoSolve: null,
+  };
 
   void loadBannerAd() {
     if (bannerAdIndex < googleBannerAdIds.length) {
@@ -376,33 +387,55 @@ class AdManager {
   }
 
   void _loadRewardedAd(RewardPlacement placement) {
+    if (_isRewardLoadInProgress[placement] == true) {
+      return;
+    }
+    _isRewardLoadInProgress[placement] = true;
     final ids = placement == RewardPlacement.hint
         ? hintRewardedAdIds
         : autoSolveRewardedAdIds;
-    final currentIndex = placement == RewardPlacement.hint
-        ? hintRewardedAdIndex
-        : autoSolveRewardedAdIndex;
+    if (ids.isEmpty) {
+      _isRewardLoadInProgress[placement] = false;
+      return;
+    }
 
-    if (currentIndex < ids.length) {
+    var currentIndex = placement == RewardPlacement.hint
+        ? hintRewardedAdIndex % ids.length
+        : autoSolveRewardedAdIndex % ids.length;
+
+    void attemptLoad() {
+      if (_rewardedAds[placement] != null) {
+        _isRewardLoadInProgress[placement] = false;
+        _rewardReadyCompleter[placement]?.complete();
+        _rewardReadyCompleter[placement] = null;
+        return;
+      }
+
       RewardedAd.load(
-        adUnitId: ids[currentIndex],
+        adUnitId: ids[currentIndex].trim(),
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (RewardedAd ad) {
             _rewardedAds[placement]?.dispose();
             _rewardedAds[placement] = ad;
+            _isRewardLoadInProgress[placement] = false;
+            _rewardReadyCompleter[placement]?.complete();
+            _rewardReadyCompleter[placement] = null;
           },
           onAdFailedToLoad: (LoadAdError error) {
+            currentIndex = (currentIndex + 1) % ids.length;
             if (placement == RewardPlacement.hint) {
-              hintRewardedAdIndex++;
+              hintRewardedAdIndex = currentIndex;
             } else {
-              autoSolveRewardedAdIndex++;
+              autoSolveRewardedAdIndex = currentIndex;
             }
-            _loadRewardedAd(placement);
+            Future<void>.delayed(const Duration(milliseconds: 700), attemptLoad);
           },
         ),
       );
     }
+
+    attemptLoad();
   }
 
   void addAds(bool interstitial, bool bannerAd, bool rewardedAd) {
@@ -426,27 +459,49 @@ class AdManager {
   }
 
   void prefetchRewardedAds() {
+    _rewardReadyCompleter[RewardPlacement.hint] ??= Completer<void>();
+    _rewardReadyCompleter[RewardPlacement.autoSolve] ??= Completer<void>();
     if (_rewardedAds[RewardPlacement.hint] == null) {
       _loadRewardedAd(RewardPlacement.hint);
+    } else if (!(_rewardReadyCompleter[RewardPlacement.hint]?.isCompleted ??
+        true)) {
+      _rewardReadyCompleter[RewardPlacement.hint]?.complete();
+      _rewardReadyCompleter[RewardPlacement.hint] = null;
     }
     if (_rewardedAds[RewardPlacement.autoSolve] == null) {
       _loadRewardedAd(RewardPlacement.autoSolve);
+    } else if (!(_rewardReadyCompleter[RewardPlacement.autoSolve]?.isCompleted ??
+        true)) {
+      _rewardReadyCompleter[RewardPlacement.autoSolve]?.complete();
+      _rewardReadyCompleter[RewardPlacement.autoSolve] = null;
     }
   }
 
-  Future<bool> showRewardedAdForPlacement(
+  Future<void> waitUntilRewardedAdIsReady(RewardPlacement placement) async {
+    if (_rewardedAds[placement] != null) {
+      return;
+    }
+    _rewardReadyCompleter[placement] ??= Completer<void>();
+    _loadRewardedAd(placement);
+    await _rewardReadyCompleter[placement]!.future;
+  }
+
+  Future<RewardShowResult> showRewardedAdForPlacement(
     RewardPlacement placement, {
     required void Function() onRewardEarned,
   }) async {
     final ad = _rewardedAds[placement];
     if (ad == null) {
       _loadRewardedAd(placement);
-      return false;
+      return RewardShowResult.notReady;
     }
 
-    var rewarded = false;
+    var didEarnReward = false;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
+        if (didEarnReward) {
+          onRewardEarned();
+        }
         ad.dispose();
         _rewardedAds[placement] = null;
         _loadRewardedAd(placement);
@@ -460,11 +515,10 @@ class AdManager {
     ad.setImmersiveMode(true);
     await ad.show(
       onUserEarnedReward: (adWithoutView, reward) {
-        rewarded = true;
-        onRewardEarned();
+        didEarnReward = true;
       },
     );
-    return rewarded;
+    return RewardShowResult.shown;
   }
 
   void showRewardedAd() {
@@ -479,6 +533,12 @@ class AdManager {
     _interstitialAd?.dispose();
     for (final ad in _rewardedAds.values) {
       ad?.dispose();
+    }
+    for (final placement in RewardPlacement.values) {
+      if (!(_rewardReadyCompleter[placement]?.isCompleted ?? true)) {
+        _rewardReadyCompleter[placement]?.complete();
+      }
+      _rewardReadyCompleter[placement] = null;
     }
   }
 }

@@ -137,25 +137,14 @@ class _BoardControlsState extends State<BoardControls> {
                         ),
                       ),
                       onPressed: () async {
-                        final rewarded =
-                            await adManager.showRewardedAdForPlacement(
-                          RewardPlacement.hint,
+                        await _showRewardedAdWithLoader(
+                          placement: RewardPlacement.hint,
                           onRewardEarned: () {
                             context
                                 .read<PuzzleSolverBloc>()
                                 .add(SolutionViewed());
                           },
                         );
-                        if (!rewarded && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Hint ad is loading. Please try again in a moment.',
-                              ),
-                            ),
-                          );
-                          adManager.prefetchRewardedAds();
-                        }
                       },
                     ),
                   ),
@@ -186,25 +175,14 @@ class _BoardControlsState extends State<BoardControls> {
                         ),
                       ),
                       onPressed: () async {
-                        final rewarded =
-                            await adManager.showRewardedAdForPlacement(
-                          RewardPlacement.autoSolve,
+                        await _showRewardedAdWithLoader(
+                          placement: RewardPlacement.autoSolve,
                           onRewardEarned: () {
                             context
                                 .read<PuzzleSolverBloc>()
                                 .add(SolutionPlayed());
                           },
                         );
-                        if (!rewarded && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Auto-solve ad is loading. Please try again in a moment.',
-                              ),
-                            ),
-                          );
-                          adManager.prefetchRewardedAds();
-                        }
                       },
                     ),
                   ),
@@ -340,6 +318,99 @@ class _BoardControlsState extends State<BoardControls> {
               const SizedBox(width: 6),
               trailing,
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRewardedAdWithLoader({
+    required RewardPlacement placement,
+    required VoidCallback onRewardEarned,
+  }) async {
+    if (!mounted) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (dialogContext) => const _AdLoadingDialog(),
+    );
+
+    try {
+      while (mounted) {
+        await adManager.waitUntilRewardedAdIsReady(placement);
+        if (!mounted) {
+          break;
+        }
+        final showResult = await adManager.showRewardedAdForPlacement(
+          placement,
+          onRewardEarned: onRewardEarned,
+        );
+        if (showResult == RewardShowResult.shown) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 450));
+      }
+    } finally {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      adManager.prefetchRewardedAds();
+    }
+  }
+}
+
+class _AdLoadingDialog extends StatelessWidget {
+  const _AdLoadingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: scheme.outline),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withOpacity(0.18),
+              blurRadius: 18,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(
+                strokeWidth: 3.2,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Loading Reward Ad...',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Please wait',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
           ],
         ),
       ),
