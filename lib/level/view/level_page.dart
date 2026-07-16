@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:blocked/level/level.dart';
+import 'package:blocked/level/widgets/how_to_play_sheet.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:blocked/solver/puzzle_solver.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
@@ -56,6 +58,10 @@ class _LevelPageViewState extends State<_LevelPageView> {
   Timer? _ticker;
   bool _savedCompletion = false;
   bool _shownWinSheet = false;
+  // Lets the BlocConsumer listener tell "block actually slid" apart from
+  // "block bumped into a wall" apart from "just a rebuild", so haptics only
+  // fire once per real move, not once per frame.
+  Move? _lastLatestMove;
   late final Future<int?> _minimumMovesFuture;
   int? _minimumMoves;
 
@@ -71,6 +77,25 @@ class _LevelPageViewState extends State<_LevelPageView> {
       if (mounted) {
         setState(() {});
       }
+    });
+    _maybeShowTutorial();
+  }
+
+  // Shows the "How to Play" sheet exactly once per install, the first time
+  // any level page opens. Runs after the first frame so it layers on top of
+  // an already-built board instead of racing the page's own entrance
+  // animation, and pauses the stopwatch while it's up so reading the rules
+  // doesn't cost the player moves-per-second/time-based stats.
+  Future<void> _maybeShowTutorial() async {
+    final seen = await hasSeenTutorial();
+    if (seen || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _stopwatch.stop();
+      await HowToPlaySheet.show(context);
+      if (!mounted) return;
+      _stopwatch.start();
+      await markTutorialSeen();
     });
   }
 
@@ -121,8 +146,24 @@ class _LevelPageViewState extends State<_LevelPageView> {
                       previous.isCompleted != current.isCompleted ||
                       previous.latestMove != current.latestMove,
                   listener: (context, state) {
+                    final move = state.latestMove;
+                    if (move != _lastLatestMove) {
+                      _lastLatestMove = move;
+                      if (move is Move) {
+                        // Real slide: light, crisp tick — confirms the drop.
+                        // Blocked against a wall: a slightly heavier buzz —
+                        // reads as "resistance" instead of silence, so a
+                        // failed drag still feels intentional, not broken.
+                        if (move.didMove) {
+                          HapticFeedback.selectionClick();
+                        } else {
+                          HapticFeedback.lightImpact();
+                        }
+                      }
+                    }
                     if (state.isCompleted && !_savedCompletion) {
                       _savedCompletion = true;
+                      HapticFeedback.mediumImpact();
                       _confettiKey.currentState?.burst();
                       _saveCompletionAndCelebrate(context, state.moves);
                     }
@@ -268,176 +309,286 @@ class _LevelPageViewState extends State<_LevelPageView> {
       moves: moveCount,
       minimumMoves: _minimumMoves ?? moveCount,
     );
-    showDialog<void>(
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isPerfect = stars == 3;
+
+    // Badge reads at a glance: gold trophy only for a perfect solve, silver
+    // medal for a solid clear, a plain check for a scrappy one.
+    final badgeIcon = stars == 3
+        ? Icons.emoji_events_rounded
+        : stars == 2
+            ? Icons.military_tech_rounded
+            : Icons.check_circle_rounded;
+    final badgeColor = stars == 3
+        ? colors.tertiary
+        : stars == 2
+            ? colors.secondary
+            : colors.primary;
+
+    // showGeneralDialog (instead of showDialog) so the whole card can pop in
+    // with a scale+fade instead of Flutter's default flat fade — matches the
+    // confetti/star-pop energy already happening behind it.
+    showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        final isPerfect = stars == 3;
-        return Dialog(
-          backgroundColor: theme.colorScheme.surface.withOpacity(0),
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 430),
-            padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withOpacity(0.96),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.45),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withOpacity(0.42),
-                  blurRadius: 34,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: theme.colorScheme.primary.withOpacity(0.10),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withOpacity(0.35),
+      barrierLabel: 'Level complete',
+      barrierColor: Colors.black.withOpacity(0.6),
+      transitionDuration: const Duration(milliseconds: 380),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Center(
+          child: Material(
+            type: MaterialType.transparency,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: colors.outline.withOpacity(0.25)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.35),
+                      blurRadius: 40,
+                      offset: const Offset(0, 18),
                     ),
-                  ),
-                  child: Text(
-                    widget.level.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Stars pop in one-by-one instead of appearing all at once.
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    3,
-                    (index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: index < stars ? 1 : 0),
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.elasticOut,
-                        builder: (context, value, child) => Transform.scale(
-                          scale: 0.6 + (0.4 * value),
-                          child: child,
-                        ),
-                        child: Icon(
-                          Icons.star_rounded,
-                          size: 42,
-                          color: index < stars
-                              ? theme.colorScheme.tertiary
-                              : theme.colorScheme.outline.withOpacity(0.35),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  isPerfect ? 'Excellent!' : 'Completed!',
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    color: isPerfect
-                        ? theme.colorScheme.tertiary
-                        : theme.colorScheme.primary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isPerfect
-                      ? 'Perfect solve! Maximum stars earned!'
-                      : 'Nice solve! Keep improving your moves.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.32),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(0.40),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      _ResultRow(
-                        label: 'Time',
-                        value: _formatDuration(_stopwatch.elapsed),
-                      ),
-                      const Divider(height: 16),
-                      _ResultRow(label: 'Moves', value: '$moveCount'),
-                      const Divider(height: 16),
-                      _ResultRow(
-                        label: 'Stars Earned',
-                        value: '+${stars * 10} ⭐',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          context.read<LevelBloc>().add(const LevelReset());
-                          _savedCompletion = false;
-                          _shownWinSheet = false;
-                          _stopwatch
-                            ..reset()
-                            ..start();
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Retry'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          context.read<LevelNavigation>().onExit();
-                        },
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        label: const Text('Levels'),
-                      ),
+                    BoxShadow(
+                      color: badgeColor.withOpacity(0.18),
+                      blurRadius: 60,
+                      spreadRadius: -10,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      context.read<LevelNavigation>().onNext();
-                    },
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Next'),
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // --- Badge: soft radial glow behind a trophy/medal icon ---
+                    SizedBox(
+                      width: 84,
+                      height: 84,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 84,
+                            height: 84,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  badgeColor.withOpacity(0.28),
+                                  badgeColor.withOpacity(0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: badgeColor.withOpacity(0.14),
+                              border: Border.all(
+                                color: badgeColor.withOpacity(0.5),
+                                width: 1.4,
+                              ),
+                            ),
+                            child: Icon(badgeIcon, color: badgeColor, size: 30),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.level.name,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Stars pop in one-by-one instead of appearing all at once.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        3,
+                        (index) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: index < stars ? 1 : 0),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.elasticOut,
+                            builder: (context, value, child) => Transform.scale(
+                              scale: 0.6 + (0.4 * value),
+                              child: child,
+                            ),
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 40,
+                              color: index < stars
+                                  ? colors.tertiary
+                                  : colors.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isPerfect ? 'Excellent!' : 'Completed!',
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        color: isPerfect ? colors.tertiary : colors.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isPerfect
+                          ? 'Perfect solve! Maximum stars earned!'
+                          : 'Nice solve! Keep improving your moves.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- Stats: three scannable chips instead of one plain
+                    // bordered box with dividers, each carrying its own icon
+                    // and accent so the eye can compare them at a glance.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _WinStatChip(
+                            icon: Icons.timer_rounded,
+                            color: colors.primary,
+                            value: _formatDuration(_stopwatch.elapsed),
+                            label: 'Time',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _WinStatChip(
+                            icon: Icons.swap_horiz_rounded,
+                            color: colors.secondary,
+                            value: '$moveCount',
+                            label: 'Moves',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _WinStatChip(
+                            icon: Icons.star_rounded,
+                            color: colors.tertiary,
+                            value: '+${stars * 10}',
+                            label: 'Stars',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    // --- Primary CTA: gradient-filled, full width — reads as
+                    // "the one thing to tap" instead of competing with Retry
+                    // and Levels for attention.
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.primary.withOpacity(0.4),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [colors.primary, colors.tertiary],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.pop(dialogContext);
+                                  context.read<LevelNavigation>().onNext();
+                                },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Next Level',
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        color: colors.onPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(Icons.arrow_forward_rounded,
+                                        color: colors.onPrimary, size: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // --- Secondary actions: demoted below the primary CTA,
+                    // plain text buttons so they don't visually compete.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(dialogContext);
+                              context.read<LevelBloc>().add(const LevelReset());
+                              _savedCompletion = false;
+                              _shownWinSheet = false;
+                              _stopwatch
+                                ..reset()
+                                ..start();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Retry'),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(dialogContext);
+                              context.read<LevelNavigation>().onExit();
+                            },
+                            icon: const Icon(Icons.grid_view_rounded, size: 18),
+                            label: const Text('Levels'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
+        );
+      },
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final eased = Curves.easeOutBack.transform(animation.value);
+        return Opacity(
+          opacity: animation.value.clamp(0.0, 1.0),
+          child: Transform.scale(scale: 0.82 + (0.18 * eased), child: child),
         );
       },
     );
@@ -614,33 +765,48 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _ResultRow extends StatelessWidget {
-  const _ResultRow({required this.label, required this.value});
+class _WinStatChip extends StatelessWidget {
+  const _WinStatChip({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+  });
 
-  final String label;
+  final IconData icon;
+  final Color color;
   final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.28)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -15,6 +15,20 @@ const _levelsSolvedKey = 'progress.levelsSolved';
 const _currentStreakKey = 'progress.currentStreak';
 const _bestStreakKey = 'progress.bestStreak';
 const _lastPlayDateKey = 'progress.lastPlayDate';
+const _hasSeenTutorialKey = 'progress.hasSeenTutorial';
+
+/// Whether the one-time "How to Play" overlay has already been shown.
+/// Checked once when the first level page mounts; kept here (not a widget
+/// field) so it survives app restarts and only ever shows once per install.
+Future<bool> hasSeenTutorial() async {
+  final sharedPreferences = await SharedPreferences.getInstance();
+  return sharedPreferences.getBool(_hasSeenTutorialKey) ?? false;
+}
+
+Future<void> markTutorialSeen() async {
+  final sharedPreferences = await SharedPreferences.getInstance();
+  await sharedPreferences.setBool(_hasSeenTutorialKey, true);
+}
 
 @immutable
 class PlayerProgress {
@@ -39,8 +53,7 @@ Future<void> markLevelAsCompleted(
 }) async {
   final sharedPreferences = await SharedPreferences.getInstance();
   final oldStars = sharedPreferences.getInt('$_starsPrefix$levelName') ?? 0;
-  final newStars =
-      calculateStars(moves: moves, minimumMoves: minimumMoves);
+  final newStars = calculateStars(moves: moves, minimumMoves: minimumMoves);
   final savedStars = newStars > oldStars ? newStars : oldStars;
 
   final wasCompleted = await isLevelCompleted(levelName);
@@ -53,7 +66,8 @@ Future<void> markLevelAsCompleted(
   }
   final bestSeconds = sharedPreferences.getInt('$_bestSecondsPrefix$levelName');
   if (bestSeconds == null || elapsedSeconds < bestSeconds) {
-    await sharedPreferences.setInt('$_bestSecondsPrefix$levelName', elapsedSeconds);
+    await sharedPreferences.setInt(
+        '$_bestSecondsPrefix$levelName', elapsedSeconds);
   }
 
   if (!wasCompleted) {
@@ -227,7 +241,8 @@ Future<bool> _isNextChapterUnlocked(LevelChapter chapter) async {
 Future<bool> hasProgress() async {
   final sharedPreferences = await SharedPreferences.getInstance();
   for (final key in sharedPreferences.getKeys()) {
-    if (key.startsWith(_levelPrefix) && (sharedPreferences.getBool(key) ?? false)) {
+    if (key.startsWith(_levelPrefix) &&
+        (sharedPreferences.getBool(key) ?? false)) {
       return true;
     }
     if (!key.startsWith('progress.') &&
