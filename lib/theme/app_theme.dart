@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme_presets.dart';
 
-ThemeData createBlockedTheme(Brightness brightness, {required Color accent}) {
+ThemeData createBlockedTheme(Brightness brightness) {
   const appError = Color(0xFFFF5252);
   final isDark = brightness == Brightness.dark;
-  final preset = ThemePresets.resolveByColor(accent);
+  final preset = ThemePresets.wood;
   final card = isDark ? preset.darkCard : preset.lightCard;
   final card2 = isDark ? preset.darkCard2 : preset.lightCard2;
   final border = isDark ? preset.darkBorder : preset.lightBorder;

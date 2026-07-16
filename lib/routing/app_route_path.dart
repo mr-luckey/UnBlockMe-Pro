@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:archive/archive.dart';
-
 class AppRoutePath {
   const AppRoutePath(this.location);
   const AppRoutePath.home() : this('/');
@@ -31,26 +27,4 @@ class LevelRoutePath extends AppRoutePath {
   bool get isChapterSelection => chapterName == null;
   bool get isLevelSelection => chapterName != null && levelName == null;
   bool get isLevel => chapterName != null && levelName != null;
-}
-
-class EditorRoutePath extends AppRoutePath {
-  EditorRoutePath.editor(this.mapString)
-      : isInPreview = false,
-        super('/editor/${encodeMapString(mapString)}');
-  EditorRoutePath.generatedLevel(this.mapString)
-      : isInPreview = true,
-        super('/editor/generated/${encodeMapString(mapString)}');
-
-  final bool isInPreview;
-  final String mapString;
-}
-
-String encodeMapString(String mapString) {
-  final zlibEncoded = const ZLibEncoder().encode(utf8.encode(mapString));
-  return Uri.encodeComponent(base64.encode(zlibEncoded));
-}
-
-String decodeMapString(String encodedMapString) {
-  final zlibEncoded = base64.decode(Uri.decodeComponent(encodedMapString));
-  return utf8.decode(const ZLibDecoder().decodeBytes(zlibEncoded));
 }

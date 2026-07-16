@@ -1,11 +1,8 @@
 import 'package:assets_audio_player/assets_audio_player.dart';
-import 'package:blocked/main.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/settings/settings.dart';
-import 'package:blocked/theme/theme_presets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:blocked/widgets/app_bottom_nav.dart';
 
 import '../../ADs/ad_manager.dart';
@@ -47,80 +44,35 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: Text('Dark (fixed)'),
             ),
             const ListTile(
-              title: Text('Color'),
               leading: Icon(Icons.palette_rounded),
+              title: Text('Color'),
+              subtitle: Text('Carved Oak (fixed)'),
             ),
-            GridView.builder(
-              padding:
-                  const EdgeInsetsDirectional.fromSTEB(68.0, 16.0, 16.0, 16.0),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 256,
-                childAspectRatio: 3 / 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-              ),
-              itemCount: ThemePresets.all.length,
-              itemBuilder: (context, index) {
-                final preset = ThemePresets.all[index];
-                final color = preset.primary;
-
-                return Builder(builder: (context) {
-                  final isSelected = context.select((ThemeColorBloc bloc) =>
-                      bloc.state.color.value == color.value);
-                  return Tooltip(
-                    message: preset.name,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        /// todo ads integraation here
-                        context
-                            .read<ThemeColorBloc>()
-                            .add(ThemeColorChanged(color));
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 16.0, horizontal: 8.0),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: AspectRatio(
+                    aspectRatio: 3 / 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        borderRadius: BorderRadius.circular(16.0),
                       ),
-                      child: Stack(
-                        alignment: AlignmentDirectional.bottomEnd,
-                        children: [
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: BoardColor(
-                                data: BoardColorData.fromColorScheme(
-                                    createThemeWithBrightness(
-                                            color, Theme.of(context).brightness)
-                                        .colorScheme),
-                                child: const ThemeColorPreview(),
-                              ),
-                            ),
-                          ),
-                          if (isSelected)
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  width: 2.0,
-                                ),
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16.0),
-                              ),
-                              child: const Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Icon(
-                                  Icons.check,
-                                  size: 32.0,
-                                ),
-                              ),
-                            ),
-                        ],
+                      child: BoardColor(
+                        data: BoardColorData.fromColorScheme(
+                            Theme.of(context).colorScheme),
+                        child: const ThemeColorPreview(),
                       ),
                     ),
-                  );
-                });
-              },
+                  ),
+                ),
+              ),
             ),
             const Divider(),
             StreamBuilder<PlayerProgress>(

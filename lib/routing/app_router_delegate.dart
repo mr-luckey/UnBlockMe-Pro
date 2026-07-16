@@ -1,5 +1,4 @@
 import 'package:blocked/background/background.dart';
-import 'package:blocked/editor/editor.dart';
 import 'package:blocked/home_page.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/level_selection/level_selection.dart';
@@ -120,15 +119,6 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
                         (c) => c.name == path.chapterName,
                       )),
                     ),
-                  if (path is EditorRoutePath) ...{
-                    const MaterialPage(child: LevelEditorPage()),
-                    if (path.isInPreview)
-                      MaterialPage(
-                        key: ValueKey(path.location),
-                        child: GeneratedLevelPage(
-                            Uri.decodeComponent(path.mapString)),
-                      ),
-                  },
                   if (path is LevelRoutePath &&
                       path.chapterName != null &&
                       path.levelName != null &&
@@ -156,7 +146,8 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
                                     path.chapterName!, nextLevelName);
                               } else {
                                 () async {
-                                  final currentChapterIndex = chapters.indexWhere(
+                                  final currentChapterIndex =
+                                      chapters.indexWhere(
                                     (c) => c.name == path.chapterName!,
                                   );
                                   final nextChapterIndex =
@@ -167,8 +158,8 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
                                     return;
                                   }
 
-                                  final unlocked =
-                                      await _isChapterUnlocked(nextChapterIndex);
+                                  final unlocked = await _isChapterUnlocked(
+                                      nextChapterIndex);
                                   if (!unlocked) {
                                     await _showNextPackLockedDialog(
                                       context,
@@ -177,7 +168,8 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
                                     return;
                                   }
 
-                                  final nextChapter = chapters[nextChapterIndex];
+                                  final nextChapter =
+                                      chapters[nextChapterIndex];
                                   navigatorCubit.navigateToLevel(
                                     nextChapter.name,
                                     nextChapter.levels.first.name,
@@ -218,17 +210,7 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
 
   @override
   Future<void> setNewRoutePath(AppRoutePath configuration) {
-    if (configuration is EditorRoutePath) {
-      if (configuration.isInPreview) {
-        navigatorCubit.navigateToGeneratedLevel(configuration.mapString);
-      } else {
-        if (configuration.mapString.isEmpty) {
-          navigatorCubit.navigateToEditor();
-        } else {
-          navigatorCubit.navigateToEditorWithMapString(configuration.mapString);
-        }
-      }
-    } else if (configuration is LevelRoutePath) {
+    if (configuration is LevelRoutePath) {
       if (configuration.levelName != null) {
         navigatorCubit.navigateToLevel(
             configuration.chapterName!, configuration.levelName!);

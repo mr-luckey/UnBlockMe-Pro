@@ -1,4 +1,3 @@
-import 'package:blocked/editor/editor.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,18 +31,6 @@ class NavigatorCubit extends Cubit<AppRoutePath> {
     latestLevelName = levelName;
   }
 
-  void navigateToEditor() {
-    navigateToEditorWithMapString(kDefaultMapString);
-  }
-
-  void navigateToEditorWithMapString(String mapString) {
-    emit(EditorRoutePath.editor(mapString));
-  }
-
-  void navigateToGeneratedLevel(String mapString) {
-    emit(EditorRoutePath.generatedLevel(mapString));
-  }
-
   void navigateToPreviousPage() {
     if (state is LevelRoutePath) {
       final levelRoutePath = state as LevelRoutePath;
@@ -55,13 +42,6 @@ class NavigatorCubit extends Cubit<AppRoutePath> {
       } else if (levelRoutePath.chapterName != null) {
         // In level selection page.
         emit(const LevelRoutePath.chapterSelection());
-      } else {
-        emit(const AppRoutePath.home());
-      }
-    } else if (state is EditorRoutePath) {
-      final editorRoutePath = state as EditorRoutePath;
-      if (editorRoutePath.isInPreview) {
-        emit(EditorRoutePath.editor(editorRoutePath.mapString));
       } else {
         emit(const AppRoutePath.home());
       }

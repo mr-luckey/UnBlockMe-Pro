@@ -1,24 +1,14 @@
 import 'package:async/async.dart';
 // import 'package:blocked/ADs/ad%20helper.dart';
-import 'package:blocked/editor/editor.dart';
 import 'package:blocked/level/level.dart';
-import 'package:blocked/routing/routing.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../ADs/ad_manager.dart';
 
 class BoardControls extends StatefulWidget {
-  const BoardControls({Key? key})
-      : mapString = null,
-        super(key: key);
-  const BoardControls.generated(this.mapString, {Key? key}) : super(key: key);
-  final String? mapString;
-
-  bool get isGenerated => mapString != null;
+  const BoardControls({Key? key}) : super(key: key);
 
   @override
   State<BoardControls> createState() => _BoardControlsState();
@@ -70,15 +60,13 @@ class _BoardControlsState extends State<BoardControls> {
                     const SnackBar(content: Text('No solution found')));
                 return;
               }
-              if (!widget.isGenerated) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Solution viewed. Reload level to save progress.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content:
+                      Text('Solution viewed. Reload level to save progress.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
             }
           },
         ),
@@ -205,54 +193,6 @@ class _BoardControlsState extends State<BoardControls> {
                     ),
                   ),
                 ];
-
-                if (widget.isGenerated) {
-                  return Column(
-                    children: [
-                      Row(children: baseButtons),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AdaptiveTextButton(
-                              icon: const Icon(MdiIcons.contentCopy),
-                              label: const Text('YAML'),
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(
-                                    text: '- name: generated\n'
-                                        '  map: |-\n'
-                                        '${widget.mapString!.split('\n').map((line) => '    $line').join('\n')}',
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: AdaptiveTextButton(
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(
-                                    text:
-                                        'https://slide.jeffsieu.com/#/editor/generated/${encodeMapString(widget.mapString!)}',
-                                  ),
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Copied link to clipboard'),
-                                  ),
-                                );
-                              },
-                              icon: Icon(Icons.adaptive.share),
-                              label: const Text('Copy link'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                }
 
                 if (isNarrow) {
                   return Column(
