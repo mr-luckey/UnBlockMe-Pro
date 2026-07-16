@@ -122,7 +122,8 @@ class _BoardControlsState extends State<BoardControls> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.tertiaryContainer,
+                          color:
+                              Theme.of(context).colorScheme.tertiaryContainer,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Row(
@@ -130,8 +131,9 @@ class _BoardControlsState extends State<BoardControls> {
                           children: [
                             Icon(Icons.ondemand_video_rounded,
                                 size: 10,
-                                color:
-                                    Theme.of(context).colorScheme.onTertiaryContainer),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onTertiaryContainer),
                             // SizedBox(width: 3),
                             // Text('Ad 15s',
                             //     style: TextStyle(color: Colors.black)),
@@ -170,8 +172,9 @@ class _BoardControlsState extends State<BoardControls> {
                           children: [
                             Icon(Icons.ondemand_video_rounded,
                                 size: 10,
-                                color:
-                                    Theme.of(context).colorScheme.onSecondaryContainer),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSecondaryContainer),
                             // SizedBox(width: 3),
                             // Text('Ad 60s',
                             //     style: TextStyle(
@@ -259,13 +262,7 @@ class _BoardControlsState extends State<BoardControls> {
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
-                            label: const Text('Next'),
-                            icon: const Icon(Icons.arrow_forward),
-                            onPressed: () {
-                              context.read<LevelNavigation>().onNext();
-                            },
-                          ),
+                          child: _buildNextButton(context),
                         ),
                       ],
                     ],
@@ -277,20 +274,51 @@ class _BoardControlsState extends State<BoardControls> {
                     ...baseButtons,
                     if (isCompleted) ...[
                       const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        label: const Text('Next'),
-                        icon: const Icon(Icons.arrow_forward),
-                        onPressed: () {
-                          adManager.showInterstitial();
-                          context.read<LevelNavigation>().onNext();
-                        },
-                      ),
+                      _buildNextButton(context),
                     ],
                   ],
                 );
               },
             ),
           );
+        },
+      ),
+    );
+  }
+
+  /// The single "Next level" button used by both the narrow and wide
+  /// layouts.
+  ///
+  /// Previously this button was duplicated inline in each layout branch,
+  /// and only the wide-layout copy called `adManager.showInterstitial()`
+  /// before navigating — so on narrow screens (most phones) the
+  /// interstitial silently never showed while the wide/tablet layout
+  /// showed it. Having one method means the ad-then-navigate behavior
+  /// can't drift out of sync between the two layouts again.
+  ///
+  /// Styling is also bumped up (icon size, bold label, tonal shadow) so it
+  /// visually reads as "the one thing to tap next" rather than blending in
+  /// with Hint/Auto Solve/Reset.
+  Widget _buildNextButton(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 50,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+          elevation: 3,
+          shadowColor: colors.primary.withOpacity(0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        icon: const Icon(Icons.arrow_forward_rounded),
+        label: const Text('Next Level'),
+        onPressed: () {
+          adManager.showInterstitial();
+          context.read<LevelNavigation>().onNext();
         },
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
@@ -57,6 +58,9 @@ class _LevelPageViewState extends State<_LevelPageView> {
   bool _shownWinSheet = false;
   late final Future<int?> _minimumMovesFuture;
   int? _minimumMoves;
+
+  // Controls the confetti burst shown the instant a level completes.
+  final GlobalKey<_ConfettiBurstState> _confettiKey = GlobalKey();
 
   @override
   void initState() {
@@ -119,6 +123,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
                   listener: (context, state) {
                     if (state.isCompleted && !_savedCompletion) {
                       _savedCompletion = true;
+                      _confettiKey.currentState?.burst();
                       _saveCompletionAndCelebrate(context, state.moves);
                     }
                   },
@@ -157,55 +162,50 @@ class _LevelPageViewState extends State<_LevelPageView> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        const _GoalCard(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _StatPanel(
-                                label: 'MOVES',
-                                value: '${state.moves}',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _StatPanel(label: 'PAR', value: '$par'),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _StatPanel(
-                                label: 'BEST',
-                                value: _minimumMoves?.toString() ?? '-',
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 10),
+                        _HudCard(
+                          moves: state.moves,
+                          par: par,
+                          best: _minimumMoves,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Expanded(
-                          child: Center(
-                            child: FittedBox(
-                              child: Hero(
-                                tag: 'puzzle',
-                                flightShuttleBuilder: (
-                                  BuildContext flightContext,
-                                  Animation<double> animation,
-                                  HeroFlightDirection flightDirection,
-                                  BuildContext fromHeroContext,
-                                  BuildContext toHeroContext,
-                                ) {
-                                  final toHero = toHeroContext.widget as Hero;
-                                  return BlocProvider.value(
-                                    value: context.read<LevelBloc>(),
-                                    child: Material(
-                                      type: MaterialType.transparency,
-                                      child: toHero.child,
-                                    ),
-                                  );
-                                },
-                                child: const Puzzle(),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Center(
+                                child: FittedBox(
+                                  child: Hero(
+                                    tag: 'puzzle',
+                                    flightShuttleBuilder: (
+                                      BuildContext flightContext,
+                                      Animation<double> animation,
+                                      HeroFlightDirection flightDirection,
+                                      BuildContext fromHeroContext,
+                                      BuildContext toHeroContext,
+                                    ) {
+                                      final toHero =
+                                          toHeroContext.widget as Hero;
+                                      return BlocProvider.value(
+                                        value: context.read<LevelBloc>(),
+                                        child: Material(
+                                          type: MaterialType.transparency,
+                                          child: toHero.child,
+                                        ),
+                                      );
+                                    },
+                                    child: const Puzzle(),
+                                  ),
+                                ),
                               ),
-                            ),
+                              // Confetti sits above the board but ignores
+                              // touch, so it never blocks a replay tap.
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: _ConfettiBurst(key: _confettiKey),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -276,21 +276,22 @@ class _LevelPageViewState extends State<_LevelPageView> {
         final isPerfect = stars == 3;
         return Dialog(
           backgroundColor: theme.colorScheme.surface.withOpacity(0),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 430),
             padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.96),
+              color: theme.colorScheme.surface.withOpacity(0.96),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.45),
+                color: theme.colorScheme.outline.withOpacity(0.45),
               ),
               boxShadow: [
                 BoxShadow(
                   color: theme.colorScheme.shadow.withOpacity(0.42),
                   blurRadius: 34,
-                  offset: Offset(0, 14),
+                  offset: const Offset(0, 14),
                 ),
               ],
             ),
@@ -302,9 +303,9 @@ class _LevelPageViewState extends State<_LevelPageView> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                    color: theme.colorScheme.primary.withOpacity(0.10),
                     border: Border.all(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                      color: theme.colorScheme.primary.withOpacity(0.35),
                     ),
                   ),
                   child: Text(
@@ -315,18 +316,28 @@ class _LevelPageViewState extends State<_LevelPageView> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Stars pop in one-by-one instead of appearing all at once.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
                     3,
                     (index) => Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: Icon(
-                        Icons.star_rounded,
-                        size: 42,
-                        color: index < stars
-                            ? theme.colorScheme.tertiary
-                            : theme.colorScheme.outline.withValues(alpha: 0.35),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: index < stars ? 1 : 0),
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.elasticOut,
+                        builder: (context, value, child) => Transform.scale(
+                          scale: 0.6 + (0.4 * value),
+                          child: child,
+                        ),
+                        child: Icon(
+                          Icons.star_rounded,
+                          size: 42,
+                          color: index < stars
+                              ? theme.colorScheme.tertiary
+                              : theme.colorScheme.outline.withOpacity(0.35),
+                        ),
                       ),
                     ),
                   ),
@@ -358,11 +369,10 @@ class _LevelPageViewState extends State<_LevelPageView> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.32),
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.32),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.40),
+                      color: theme.colorScheme.outline.withOpacity(0.40),
                     ),
                   ),
                   child: Column(
@@ -460,33 +470,117 @@ String _formatDuration(Duration value) {
   return '$minutes:$seconds';
 }
 
-class _GoalCard extends StatelessWidget {
-  const _GoalCard();
+/// Merges the old `_GoalCard` + 3 separate `_StatPanel`s into a single HUD.
+///
+/// Why: the old layout gave "MOVES", "PAR" and "BEST" identical visual
+/// weight, so a player had to read all three numbers and do the comparison
+/// in their head every single move. This version keeps the goal line
+/// compact (one row, doesn't eat vertical space) and turns moves-vs-par into
+/// a colored progress bar so "am I doing well?" is answerable at a glance:
+/// green while under par, amber right at par, red once over it.
+class _HudCard extends StatelessWidget {
+  const _HudCard({
+    required this.moves,
+    required this.par,
+    required this.best,
+  });
+
+  final int moves;
+  final int par;
+  final int? best;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    final ratio = par == 0 ? 0.0 : (moves / par).clamp(0.0, 1.5);
+    final Color barColor = moves > par
+        ? colors.error
+        : moves == par
+            ? colors.tertiary
+            : colors.primary;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outline.withOpacity(0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.lightbulb_outline_rounded),
-              const SizedBox(width: 10),
+              Icon(Icons.lightbulb_outline_rounded,
+                  size: 18, color: colors.onSurfaceVariant),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Goal: Move the main block (O) to the exit →',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  'Move the main block (O) to the exit →',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$moves',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: barColor,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '/ $par par',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.emoji_events_outlined,
+                  size: 16, color: colors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                best?.toString() ?? '—',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'best',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: (ratio / 1.5).clamp(0.0, 1.0)),
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: colors.outline.withOpacity(0.2),
+                valueColor: AlwaysStoppedAnimation(barColor),
+              ),
+            ),
           ),
         ],
       ),
@@ -513,31 +607,6 @@ class _StatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16),
           const SizedBox(width: 6),
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatPanel extends StatelessWidget {
-  const _StatPanel({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Theme.of(context).colorScheme.surface,
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
-      ),
-      child: Column(
-        children: [
-          Text(value, style: Theme.of(context).textTheme.titleLarge),
           Text(label, style: Theme.of(context).textTheme.labelLarge),
         ],
       ),
@@ -574,4 +643,119 @@ class _ResultRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Lightweight star-burst played the instant a level is solved.
+///
+/// No confetti package is added to pubspec.yaml on purpose — this is plain
+/// Flutter (AnimationController + CustomPainter), so it costs nothing extra
+/// to build/ship. Call `burst()` to fire it; it auto-clears itself after
+/// the animation ends so it doesn't sit on top of the board afterwards.
+class _ConfettiBurst extends StatefulWidget {
+  const _ConfettiBurst({Key? key}) : super(key: key);
+
+  @override
+  State<_ConfettiBurst> createState() => _ConfettiBurstState();
+}
+
+class _Particle {
+  _Particle(Random random)
+      : angle = random.nextDouble() * 2 * pi,
+        speed = 120 + random.nextDouble() * 160,
+        size = 5 + random.nextDouble() * 6,
+        colorIndex = random.nextInt(_confettiColors.length),
+        spin = (random.nextBool() ? 1 : -1) * (2 + random.nextDouble() * 4);
+
+  final double angle;
+  final double speed;
+  final double size;
+  final int colorIndex;
+  final double spin;
+}
+
+const _confettiColors = [
+  Color(0xFFFFC107),
+  Color(0xFFFF5252),
+  Color(0xFF4CAF50),
+  Color(0xFF448AFF),
+  Color(0xFFAB47BC),
+];
+
+class _ConfettiBurstState extends State<_ConfettiBurst>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+  List<_Particle> _particles = [];
+
+  void burst() {
+    final random = Random();
+    setState(() {
+      _particles = List.generate(28, (_) => _Particle(random));
+    });
+    _controller
+      ..reset()
+      ..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_particles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return CustomPaint(
+          painter: _ConfettiPainter(
+            particles: _particles,
+            progress: _controller.value,
+          ),
+          size: Size.infinite,
+        );
+      },
+    );
+  }
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter({required this.particles, required this.progress});
+
+  final List<_Particle> particles;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0 || progress >= 1) return;
+    final center = Offset(size.width / 2, size.height * 0.4);
+    final fade = (1 - progress).clamp(0.0, 1.0);
+
+    for (final p in particles) {
+      final t = progress;
+      final dx = cos(p.angle) * p.speed * t;
+      final dy = sin(p.angle) * p.speed * t + (140 * t * t); // gravity
+      final position = center + Offset(dx, dy);
+      final paint = Paint()
+        ..color = _confettiColors[p.colorIndex].withOpacity(fade);
+
+      canvas.save();
+      canvas.translate(position.dx, position.dy);
+      canvas.rotate(p.spin * t * pi);
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) => true;
 }

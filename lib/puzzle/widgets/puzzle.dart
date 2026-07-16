@@ -126,7 +126,8 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                     opacity: isCompleted ? 1 : 0,
                     duration: kSlideDuration,
                     child: Container(
-                      color: Theme.of(context).colorScheme.scrim.withOpacity(0.5),
+                      color:
+                          Theme.of(context).colorScheme.scrim.withOpacity(0.5),
                       child: AnimatedScale(
                         scale: isCompleted ? 1 : 0,
                         duration: kSlideDuration * 5,
@@ -171,7 +172,9 @@ List<Segment> _getExits(
   return exits;
 }
 
-class _ExitLabel extends StatelessWidget {
+enum _ExitSide { left, right, top, bottom }
+
+class _ExitLabel extends StatefulWidget {
   const _ExitLabel({
     required this.segment,
     required this.boardWidth,
@@ -183,26 +186,124 @@ class _ExitLabel extends StatelessWidget {
   final int boardHeight;
 
   @override
+  State<_ExitLabel> createState() => _ExitLabelState();
+}
+
+class _ExitLabelState extends State<_ExitLabel>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final segment = widget.segment;
     final openingLength =
         max(segment.width.toWallSize(), segment.height.toWallSize());
     final iconSize = (openingLength * 0.52).clamp(12.0, 26.0);
+    final accent = Theme.of(context).colorScheme.primary;
 
-    final arrow = Icon(
-      Icons.arrow_forward_rounded,
-      size: iconSize,
-      color: Theme.of(context).colorScheme.primary,
+    // Which edge of the board this exit sits on. This — not the old
+    // start.x/start.y-vs-turn guesswork — is the single source of truth
+    // for both which way the arrow points AND which way it's pushed.
+    final _ExitSide side;
+    if (segment.isVertical) {
+      side = segment.start.x == widget.boardWidth
+          ? _ExitSide.right
+          : _ExitSide.left;
+    } else {
+      side = segment.start.y == widget.boardHeight
+          ? _ExitSide.bottom
+          : _ExitSide.top;
+    }
+
+    // Base icon (arrow_forward_rounded) points right (0°). Rotate it so it
+    // points the same way a block would actually leave the board on this
+    // side — right-wall exit -> arrow points right, left-wall -> left,
+    // top -> up, bottom -> down. (The previous version had these mixed up,
+    // e.g. a right-side exit rendered a downward-pointing arrow.)
+    int quarterTurns;
+    switch (side) {
+      case _ExitSide.right:
+        quarterTurns = 0;
+        break;
+      case _ExitSide.bottom:
+        quarterTurns = 1;
+        break;
+      case _ExitSide.left:
+        quarterTurns = 2;
+        break;
+      case _ExitSide.top:
+        quarterTurns = 3;
+        break;
+    }
+
+    // Push the arrow clear of the board edge, in the same direction it
+    // points, so it visually reads as "flying out" of the exit rather than
+    // sitting half-on/half-off the wall.
+    final pushDistance = iconSize * 0.85;
+    Offset outwardOffset;
+    switch (side) {
+      case _ExitSide.right:
+        outwardOffset = Offset(pushDistance, 0);
+        break;
+      case _ExitSide.left:
+        outwardOffset = Offset(-pushDistance, 0);
+        break;
+      case _ExitSide.top:
+        outwardOffset = Offset(0, -pushDistance);
+        break;
+      case _ExitSide.bottom:
+        outwardOffset = Offset(0, pushDistance);
+        break;
+    }
+
+    // The arrow used to render as a bare Icon floating in the exit gap,
+    // with nothing to anchor it visually — it read as a stray glitchy mark
+    // rather than an intentional "the exit is here" signal. Wrapping it in
+    // a soft glowing halo + a slow pulse makes it unmistakably a beacon.
+    final arrow = AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final t = _pulseController.value;
+        final scale = 1.0 + (0.12 * t);
+        final glow = 0.15 + (0.20 * t);
+        return Container(
+          padding: EdgeInsets.all(iconSize * 0.35),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: accent.withOpacity(glow),
+                blurRadius: iconSize * 0.9,
+                spreadRadius: iconSize * 0.15,
+              ),
+            ],
+          ),
+          child: Transform.scale(
+            scale: scale,
+            child: child,
+          ),
+        );
+      },
+      child: Icon(
+        Icons.arrow_forward_rounded,
+        size: iconSize,
+        color: accent,
+      ),
     );
 
-    if (segment.isVertical) {
-      final turn = segment.start.x == boardWidth ? 1 : 3;
-      return RotatedBox(quarterTurns: turn, child: arrow);
-    }
-
-    if (segment.start.y == boardHeight) {
-      return RotatedBox(quarterTurns: 2, child: arrow);
-    }
-    return arrow;
+    return Transform.translate(
+      offset: outwardOffset,
+      child: RotatedBox(quarterTurns: quarterTurns, child: arrow),
+    );
   }
 }
 
