@@ -7,6 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _levelPrefix = 'progress.level.';
+/// Set to false before release to restore level/chapter locks.
+const bool unlockAllLevelsForTesting = true;
+
 const _starsPrefix = 'progress.stars.';
 const _bestSecondsPrefix = 'progress.bestSeconds.';
 const _bestMovesPrefix = 'progress.bestMoves.';
@@ -215,6 +218,9 @@ Future<List<String>> getFirstUncompletedLevel() async {
 }
 
 Future<bool> _isNextChapterUnlocked(LevelChapter chapter) async {
+  if (unlockAllLevelsForTesting) {
+    return true;
+  }
   for (final level in chapter.levels) {
     final stars = await getLevelStars(level.name);
     if (stars < 3) {

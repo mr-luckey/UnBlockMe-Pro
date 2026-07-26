@@ -146,7 +146,8 @@ class LevelSelectionPage extends StatelessWidget {
                           final starsFuture = getLevelStars(level.name);
                           final bestMovesFuture = getBestMoves(level.name);
                           final bestSecondsFuture = getBestSeconds(level.name);
-                          final previousStarsFuture = index == 0
+                          final previousStarsFuture = unlockAllLevelsForTesting ||
+                                  index == 0
                               ? Future.value(true)
                               : getLevelStars(levels[index - 1].name)
                                   .then((stars) => stars >= 2);
@@ -154,7 +155,9 @@ class LevelSelectionPage extends StatelessWidget {
                             future: previousStarsFuture,
                             initialData: true,
                             builder: (context, prevSnapshot) {
-                              final isLocked = !(prevSnapshot.data ?? false);
+                              final isLocked = unlockAllLevelsForTesting
+                                  ? false
+                                  : !(prevSnapshot.data ?? false);
                               return LabeledPuzzleButton(
                                 onPressed: () {
                                   context

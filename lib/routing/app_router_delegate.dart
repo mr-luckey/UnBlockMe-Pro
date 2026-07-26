@@ -34,7 +34,7 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
   bool isLoaded;
 
   Future<bool> _isChapterUnlocked(int chapterIndex) async {
-    if (chapterIndex <= 0) {
+    if (unlockAllLevelsForTesting || chapterIndex <= 0) {
       return true;
     }
     final previous = chapters[chapterIndex - 1];

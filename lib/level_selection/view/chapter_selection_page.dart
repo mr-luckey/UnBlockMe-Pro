@@ -19,7 +19,7 @@ class ChapterSelectionPage extends StatelessWidget {
   final adManager = AdManager();
 
   Future<bool> _isChapterUnlocked(int index) async {
-    if (index == 0) {
+    if (unlockAllLevelsForTesting || index == 0) {
       return true;
     }
     final previous = chapters[index - 1];
