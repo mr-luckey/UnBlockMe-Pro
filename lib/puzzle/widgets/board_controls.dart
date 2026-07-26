@@ -1,14 +1,19 @@
 import 'package:async/async.dart';
-// import 'package:blocked/ADs/ad%20helper.dart';
+import 'package:blocked/ADs/ad_manager.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../ADs/ad_manager.dart';
-
 class BoardControls extends StatefulWidget {
-  const BoardControls({Key? key}) : super(key: key);
+  const BoardControls({Key? key})
+      : mapString = null,
+        super(key: key);
+  const BoardControls.generated(this.mapString, {Key? key}) : super(key: key);
+
+  final String? mapString;
+
+  bool get isGenerated => mapString != null;
 
   @override
   State<BoardControls> createState() => _BoardControlsState();
@@ -60,13 +65,15 @@ class _BoardControlsState extends State<BoardControls> {
                     const SnackBar(content: Text('No solution found')));
                 return;
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content:
-                      Text('Solution viewed. Reload level to save progress.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              if (!widget.isGenerated) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Solution viewed. Reload level to save progress.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             }
           },
         ),
@@ -198,7 +205,7 @@ class _BoardControlsState extends State<BoardControls> {
                   return Column(
                     children: [
                       Row(children: baseButtons),
-                      if (isCompleted) ...[
+                      if (isCompleted && !widget.isGenerated) ...[
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
@@ -212,7 +219,7 @@ class _BoardControlsState extends State<BoardControls> {
                 return Row(
                   children: [
                     ...baseButtons,
-                    if (isCompleted) ...[
+                    if (isCompleted && !widget.isGenerated) ...[
                       const SizedBox(width: 8),
                       _buildNextButton(context),
                     ],

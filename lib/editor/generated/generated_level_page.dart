@@ -3,7 +3,7 @@ import 'package:blocked/models/models.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:flutter/material.dart';
 
-import '../../ADs/ad_manager.dart';
+import 'package:blocked/ADs/ad_manager.dart';
 
 class GeneratedLevelPage extends StatelessWidget {
   GeneratedLevelPage(this.mapString, {Key? key}) : super(key: key) {

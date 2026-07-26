@@ -20,7 +20,7 @@ class LevelBloc extends Bloc<LevelEvent, LevelState> {
       final newStates = state.withMoveAttempt(event);
       for (var state in newStates) {
         emit(state);
-        await WidgetsBinding.instance?.endOfFrame;
+        await WidgetsBinding.instance.endOfFrame;
       }
     }
   }

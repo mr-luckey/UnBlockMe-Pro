@@ -31,8 +31,8 @@ class AppBottomNav extends StatelessWidget {
               _item(
                 context,
                 tab: AppBottomTab.levels,
-                icon: Icons.bar_chart_rounded,
-                label: 'Levels',
+                icon: Icons.map_rounded,
+                label: 'Map',
                 onTap: () =>
                     context.read<NavigatorCubit>().navigateToChapterSelection(),
               ),
