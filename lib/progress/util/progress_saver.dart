@@ -147,6 +147,55 @@ Future<int> getLevelStars(String levelName) async {
   return sharedPreferences.getInt('$_starsPrefix$levelName') ?? 0;
 }
 
+/// One SharedPreferences round-trip for the whole map (not N awaits).
+Future<MapLevelProgress> loadMapLevelProgress(List<String> levelNames) async {
+  final prefs = await SharedPreferences.getInstance();
+  final stars = <String, int>{};
+  var currentIndex = 0;
+  for (var i = 0; i < levelNames.length; i++) {
+    final name = levelNames[i];
+    final s = prefs.getInt('$_starsPrefix$name') ?? 0;
+    final completed = prefs.getBool('$_levelPrefix$name') ??
+        prefs.getBool(name) ??
+        false;
+    stars[name] = s;
+    // Advance cursor for completed levels (stars OR completion flag).
+    if (s > 0 || completed) currentIndex = i + 1;
+  }
+  if (levelNames.isEmpty) {
+    currentIndex = 0;
+  } else if (currentIndex >= levelNames.length) {
+    currentIndex = levelNames.length - 1;
+  }
+
+  final unlocked = List<bool>.generate(levelNames.length, (i) {
+    if (unlockAllLevelsForTesting || i == 0) return true;
+    final prev = levelNames[i - 1];
+    final prevDone = (stars[prev] ?? 0) >= 2 ||
+        (prefs.getBool('$_levelPrefix$prev') ?? false);
+    return prevDone;
+  });
+
+  return MapLevelProgress(
+    stars: stars,
+    unlocked: unlocked,
+    currentIndex: currentIndex,
+  );
+}
+
+@immutable
+class MapLevelProgress {
+  const MapLevelProgress({
+    required this.stars,
+    required this.unlocked,
+    required this.currentIndex,
+  });
+
+  final Map<String, int> stars;
+  final List<bool> unlocked;
+  final int currentIndex;
+}
+
 Future<int> getTotalStars() async {
   final sharedPreferences = await SharedPreferences.getInstance();
   return sharedPreferences.getInt(_totalStarsKey) ?? 0;
@@ -188,26 +237,35 @@ Future<void> clearData() async {
   _playerProgressStreamController.add(await getPlayerProgress());
 }
 
-Future<List<String>> getFirstUncompletedLevel() async {
-  final chapters = await readLevelsFromYaml();
+Future<List<String>> getFirstUncompletedLevel([
+  List<LevelChapter>? knownChapters,
+]) async {
+  // Prefer in-memory chapters — never re-parse YAML on Play tap.
+  final chapters = knownChapters ?? await readLevelsFromYaml();
+  if (chapters.isEmpty) {
+    return ['', ''];
+  }
+
+  final prefs = await SharedPreferences.getInstance();
+  bool completed(String name) =>
+      prefs.getBool('$_levelPrefix$name') ?? prefs.getBool(name) ?? false;
+  int stars(String name) => prefs.getInt('$_starsPrefix$name') ?? 0;
+
   for (var i = 0; i < chapters.length; i++) {
     final chapter = chapters[i];
 
-    // Find first unsolved level in the current chapter.
     for (final level in chapter.levels) {
-      if (!await isLevelCompleted(level.name)) {
+      if (!completed(level.name)) {
         return [chapter.name, level.name];
       }
     }
 
-    // If this chapter is fully solved but not max-starred, keep the user here
-    // until they earn enough stars to unlock the next pack.
     if (i < chapters.length - 1) {
-      final nextChapterUnlocked = await _isNextChapterUnlocked(chapter);
-      if (!nextChapterUnlocked) {
+      final nextUnlocked = unlockAllLevelsForTesting ||
+          chapter.levels.every((l) => stars(l.name) >= 3);
+      if (!nextUnlocked) {
         for (final level in chapter.levels) {
-          final stars = await getLevelStars(level.name);
-          if (stars < 3) {
+          if (stars(level.name) < 3) {
             return [chapter.name, level.name];
           }
         }
@@ -215,19 +273,6 @@ Future<List<String>> getFirstUncompletedLevel() async {
     }
   }
   return [chapters.last.name, chapters.last.levels.last.name];
-}
-
-Future<bool> _isNextChapterUnlocked(LevelChapter chapter) async {
-  if (unlockAllLevelsForTesting) {
-    return true;
-  }
-  for (final level in chapter.levels) {
-    final stars = await getLevelStars(level.name);
-    if (stars < 3) {
-      return false;
-    }
-  }
-  return true;
 }
 
 Future<bool> hasProgress() async {

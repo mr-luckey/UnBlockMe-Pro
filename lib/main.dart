@@ -1,21 +1,26 @@
+import 'dart:async';
+
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:blocked/ADs/ad_manager.dart';
+import 'package:blocked/audio/game_feel.dart';
+import 'package:blocked/audio/game_music.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:blocked/settings/settings.dart';
 import 'package:blocked/theme/theme.dart';
 import 'package:blocked/theme/theme_presets.dart';
-// import 'package:facebook_audience_network/facebook_audience_network.dart';
+import 'package:blocked/widgets/app_exit_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AdManager();
-  // FacebookAudienceNetwork.init();
   await MobileAds.instance.initialize();
+  // Silent background loads only — no haptic, no SFX playback here.
+  unawaited(GameMusic.instance.init());
+  unawaited(GameFeel.instance.init());
   final levels = await readLevelsFromYaml();
   final savedThemeColor = await getSavedColor();
   runApp(BlockedApp(
@@ -24,8 +29,8 @@ void main() async {
   ));
 }
 
-ThemeData createThemeWithBrightness(Color _primary, Brightness brightness) {
-  return createBlockedTheme(brightness, accent: _primary);
+ThemeData createThemeWithBrightness(Color primary, Brightness brightness) {
+  return createBlockedTheme(brightness, accent: primary);
 }
 
 class BlockedApp extends StatefulWidget {
@@ -46,11 +51,26 @@ class _BlockedAppState extends State<BlockedApp> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
   final NavigatorCubit navigatorCubit =
       NavigatorCubit(const AppRoutePath.home());
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AdManager().bootstrap(
+        interstitial: true,
+        banner: true,
+        rewarded: true,
+      );
+      // Music only — never warmUp/haptic on home.
+      GameMusic.instance.ensurePlaying();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          ThemeColorBloc(widget.savedThemeColor ?? ThemePresets.all.first.primary),
+      create: (context) => ThemeColorBloc(
+          widget.savedThemeColor ?? ThemePresets.all.first.primary),
       child: BlocBuilder<ThemeColorBloc, ThemeColorState>(
         buildWhen: (previous, current) => previous.color != current.color,
         builder: (context, state) {
@@ -88,6 +108,12 @@ class _BlockedAppState extends State<BlockedApp> {
                     navigatorKey: navigatorKey,
                     navigatorCubit: navigatorCubit,
                   ),
+                  builder: (context, child) {
+                    return AppExitScope(
+                      navigatorKey: navigatorKey,
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
                 ),
               ),
             ),

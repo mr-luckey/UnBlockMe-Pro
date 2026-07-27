@@ -17,35 +17,59 @@ class PuzzleSolverBloc extends Bloc<PuzzleSolverEvent, PuzzleSolverState> {
 
   final LevelBloc levelBloc;
 
+  /// HINT: apply only the next correct move on the live board.
+  /// (No SolutionPage — avoids Hero crash with the play-screen board.)
   void _onSolutionViewed(
       SolutionViewed event, Emitter<PuzzleSolverState> emit) async {
-    final requestedState = state.copyWithSolutionRequested();
-    emit(requestedState);
+    if (levelBloc.state.isCompleted) return;
 
-    final viewedState = await requestedState
-        .copyWithSolutionViewed(viewed: true)
-        .copyWithSolutionFor(levelBloc.initialState.puzzle);
+    await state.solutionPlayback?.cancel();
 
-    final isInitialState =
-        levelBloc.state.puzzle == levelBloc.initialState.puzzle;
+    emit(state.copyWithSolutionRequested());
 
-    if (!isInitialState) {
-      levelBloc.add(const LevelReset());
-      await Future.delayed(kSlideDuration);
+    final moves = await solve(levelBloc.state.puzzle);
+    if (isClosed) return;
+
+    emit(
+      PuzzleSolverState(
+        solution: moves,
+        hasSolutionResult: true,
+        isSolutionRequested: false,
+        isSolutionVisible: false,
+        solutionPlayback: null,
+      ),
+    );
+
+    if (moves != null && moves.isNotEmpty && !levelBloc.state.isCompleted) {
+      levelBloc.add(MoveAttempt(moves.first));
     }
-    emit(viewedState);
   }
 
+  /// SOLVE: reset to start (if needed) and animate the full solution on-board.
   void _onSolutionPlayed(
       SolutionPlayed event, Emitter<PuzzleSolverState> emit) async {
+    if (levelBloc.state.isCompleted) return;
+
+    await state.solutionPlayback?.cancel();
+
     final requestedState = state.copyWithSolutionRequested();
     emit(requestedState);
 
-    final newState =
-        await requestedState.copyWithSolutionFor(levelBloc.initialState.puzzle);
-    final moves = newState.solution!;
+    // Always re-solve from the *initial* puzzle (hint may have cached a
+    // mid-game partial path).
+    final moves = await solve(levelBloc.initialState.puzzle);
+    if (isClosed) return;
 
+    final newState = PuzzleSolverState(
+      solution: moves,
+      hasSolutionResult: true,
+      isSolutionRequested: false,
+      isSolutionVisible: false,
+      solutionPlayback: null,
+    );
     emit(newState);
+
+    if (moves == null || moves.isEmpty) return;
 
     Future<void> runSolution() async {
       final isInitialState =
@@ -56,7 +80,8 @@ class PuzzleSolverBloc extends Bloc<PuzzleSolverEvent, PuzzleSolverState> {
         await Future.delayed(kSlideDuration * 1.5);
       }
 
-      for (var move in moves) {
+      for (final move in moves) {
+        if (levelBloc.isClosed || levelBloc.state.isCompleted) break;
         levelBloc.add(MoveAttempt(move));
         await Future.delayed(kSlideDuration * 1.5);
       }

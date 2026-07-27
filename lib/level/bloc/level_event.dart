@@ -14,6 +14,10 @@ class LevelReset extends LevelEvent {
   const LevelReset();
 }
 
+class LevelUndo extends LevelEvent {
+  const LevelUndo();
+}
+
 class MoveAttempt extends LevelEvent {
   const MoveAttempt(this.direction);
 

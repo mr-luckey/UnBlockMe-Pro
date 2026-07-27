@@ -2,7 +2,7 @@ import 'package:blocked/routing/routing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-enum AppBottomTab { home, levels, editor, settings }
+enum AppBottomTab { home, levels, settings }
 
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({Key? key, required this.current}) : super(key: key);
@@ -31,24 +31,18 @@ class AppBottomNav extends StatelessWidget {
               _item(
                 context,
                 tab: AppBottomTab.levels,
-                icon: Icons.bar_chart_rounded,
-                label: 'Levels',
+                icon: Icons.map_rounded,
+                label: 'Map',
                 onTap: () =>
                     context.read<NavigatorCubit>().navigateToChapterSelection(),
-              ),
-              _item(
-                context,
-                tab: AppBottomTab.editor,
-                icon: Icons.edit_rounded,
-                label: 'Editor',
-                onTap: () => context.read<NavigatorCubit>().navigateToEditor(),
               ),
               _item(
                 context,
                 tab: AppBottomTab.settings,
                 icon: Icons.settings_rounded,
                 label: 'Settings',
-                onTap: () => context.read<NavigatorCubit>().navigateToSettings(),
+                onTap: () =>
+                    context.read<NavigatorCubit>().navigateToSettings(),
               ),
             ],
           ),
@@ -79,7 +73,11 @@ class AppBottomNav extends StatelessWidget {
             children: [
               Icon(icon, color: color),
               const SizedBox(height: 2),
-              Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
+              Text(label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: color)),
             ],
           ),
         ),

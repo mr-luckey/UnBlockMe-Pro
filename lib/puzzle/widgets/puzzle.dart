@@ -48,6 +48,7 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
               previous.latestMove != current.latestMove,
           listener: (context, state) async {
             final latestMove = state.latestMove;
+            // Bounce only — haptic/SFX are fired from LevelBloc (first-move safe).
             if (latestMove != null && !latestMove.didMove) {
               await _controller.forward(from: 0);
               await _controller.reverse();

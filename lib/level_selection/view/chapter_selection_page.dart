@@ -5,18 +5,14 @@ import 'package:blocked/models/models.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/routing/routing.dart';
+import 'package:blocked/widgets/app_bottom_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:blocked/widgets/app_bottom_nav.dart';
-import '../../ADs/ad_manager.dart';
 
 class ChapterSelectionPage extends StatelessWidget {
-  ChapterSelectionPage(this.chapters, {Key? key}) : super(key: key) {
-    adManager.addAds(true, true, false);
-  }
+  ChapterSelectionPage(this.chapters, {Key? key}) : super(key: key);
 
   final List<LevelChapter> chapters;
-  final adManager = AdManager();
 
   Future<bool> _isChapterUnlocked(int index) async {
     if (unlockAllLevelsForTesting || index == 0) {

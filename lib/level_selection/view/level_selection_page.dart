@@ -5,20 +5,16 @@ import 'package:blocked/models/models.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
 import 'package:blocked/routing/routing.dart';
+import 'package:blocked/widgets/app_bottom_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:blocked/widgets/app_bottom_nav.dart';
-import '../../ADs/ad_manager.dart';
 
 class LevelSelectionPage extends StatelessWidget {
   LevelSelectionPage(this.chapter, {Key? key})
       : levels = chapter.levels.map((data) => data.toLevel()).toList(),
-        super(key: key) {
-    adManager.addAds(true, true, false);
-  }
+        super(key: key);
 
   final LevelChapter chapter;
-  final adManager = AdManager();
   final List<Level> levels;
 
   Future<int> _completedCount() async {

@@ -41,7 +41,16 @@ class LevelState {
         newPuzzle.controlledBlock != puzzle.controlledBlock && !wasCut;
 
     if (isMoveBlockedByWall || cannotBeCut) {
-      return [this];
+      // Still emit a blocked move so bounce + haptic/SFX fire.
+      final nextMoves = move is Move ? moves : moves;
+      return [
+        LevelState(
+          puzzle,
+          isCompleted: isCompleted,
+          latestMove: move.blocked(movedBlock),
+          moves: nextMoves,
+        ),
+      ];
     } else if (isMoveBlockedByControlShift || isMoveFailedControlShift) {
       final nextMoves = move is Move ? moves : moves + 1;
       return [

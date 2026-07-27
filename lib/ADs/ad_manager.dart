@@ -1,544 +1,596 @@
-// import 'package:facebook_audience_network/facebook_audience_network.dart';
-// import 'package:google_mobile_ads/google_mobile_ads.dart';
-// // import 'package:flutter_facebook_audience_network/flutter_facebook_audience_network.dart';
-
-// class AdManager {
-//   BannerAd? _bannerAd;
-//   InterstitialAd? _interstitialAd;
-//   RewardedAd? _rewardedAd;
-
-//   // List of ad unit IDs for Google Ads
-//   final List<String> googleBannerAdIds = [
-//     "ca-app-pub-5561438827097019/5440263702",
-//     "ca-app-pub-5561438827097019/9075891424",
-//   ];
-
-//   final List<String> googleInterstitialAdIds = [
-//     "ca-app-pub-5561438827097019/5136646412",
-//     "ca-app-pub-5561438827097019/1767777858",
-//   ];
-
-//   final List<String> googleRewardedAdIds = [
-//     "ca-app-pub-5561438827097019/3823564740",
-//     "ca-app-pub-5561438827097019/2510483076",
-//   ];
-
-//   // List of ad unit IDs for Facebook Ads
-//   final List<String> facebookBannerAdIds = [
-//     "532584862762491_532586772762300",
-//     "532584862762491_532587039428940",
-//   ];
-
-//   final List<String> facebookInterstitialAdIds = [
-//     "532584862762491_532587406095570",
-//     "532584862762491_532587779428866",
-//   ];
-
-//   final List<String> facebookRewardedAdIds = [
-//     "532584862762491_532589669428677",
-//     "532584862762491_532590162761961",
-//   ];
-
-//   int bannerAdIndex = 0;
-//   int interstitialAdIndex = 0;
-//   int rewardedAdIndex = 0;
-
-//   int facebookBannerAdIndex = 0;
-//   int facebookInterstitialAdIndex = 0;
-//   int facebookRewardedAdIndex = 0;
-
-//   bool _useGoogleAds = true;
-
-//   void loadBannerAd() {
-//     if (_useGoogleAds) {
-//       if (bannerAdIndex < googleBannerAdIds.length) {
-//         _bannerAd = BannerAd(
-//           adUnitId: googleBannerAdIds[bannerAdIndex],
-//           size: AdSize.banner,
-//           request: const AdRequest(),
-//           listener: BannerAdListener(
-//             onAdFailedToLoad: (Ad ad, LoadAdError error) {
-//               bannerAdIndex++;
-//               if (bannerAdIndex >= googleBannerAdIds.length) {
-//                 _useGoogleAds = false;
-//                 loadBannerAd(); // Switch to Facebook Ads
-//               } else {
-//                 loadBannerAd(); // Retry with the next Google ad unit ID
-//               }
-//             },
-//           ),
-//         );
-
-//         _bannerAd?.load();
-//       } else {
-//         // Switch to Facebook Ads if Google Ads failed
-//         loadFacebookBannerAd();
-//       }
-//     } else {
-//       loadFacebookBannerAd();
-//     }
-//   }
-
-//   void loadInterstitialAd() {
-//     if (_useGoogleAds) {
-//       if (interstitialAdIndex < googleInterstitialAdIds.length) {
-//         InterstitialAd.load(
-//           adUnitId: googleInterstitialAdIds[interstitialAdIndex],
-//           request: const AdRequest(),
-//           adLoadCallback: InterstitialAdLoadCallback(
-//             onAdLoaded: (InterstitialAd ad) {
-//               _interstitialAd = ad;
-//               ad.fullScreenContentCallback = FullScreenContentCallback(
-//                 onAdDismissedFullScreenContent: (InterstitialAd ad) {
-//                   ad.dispose();
-//                   loadInterstitialAd();
-//                 },
-//                 onAdFailedToShowFullScreenContent:
-//                     (InterstitialAd ad, AdError error) {
-//                   ad.dispose();
-//                   loadInterstitialAd();
-//                 },
-//               );
-//             },
-//             onAdFailedToLoad: (LoadAdError error) {
-//               interstitialAdIndex++;
-//               if (interstitialAdIndex >= googleInterstitialAdIds.length) {
-//                 _useGoogleAds = false;
-//                 loadInterstitialAd(); // Switch to Facebook Ads
-//               } else {
-//                 loadInterstitialAd(); // Retry with the next Google ad unit ID
-//               }
-//             },
-//           ),
-//         );
-//       } else {
-//         // Switch to Facebook Ads if Google Ads failed
-//         loadFacebookInterstitialAd();
-//       }
-//     } else {
-//       loadFacebookInterstitialAd();
-//     }
-//   }
-
-//   void loadRewardedAd() {
-//     if (_useGoogleAds) {
-//       if (rewardedAdIndex < googleRewardedAdIds.length) {
-//         RewardedAd.load(
-//           adUnitId: googleRewardedAdIds[rewardedAdIndex],
-//           request: const AdRequest(),
-//           rewardedAdLoadCallback: RewardedAdLoadCallback(
-//             onAdLoaded: (RewardedAd ad) {
-//               _rewardedAd = ad;
-//             },
-//             onAdFailedToLoad: (LoadAdError error) {
-//               rewardedAdIndex++;
-//               if (rewardedAdIndex >= googleRewardedAdIds.length) {
-//                 _useGoogleAds = false;
-//                 loadRewardedAd(); // Switch to Facebook Ads
-//               } else {
-//                 loadRewardedAd(); // Retry with the next Google ad unit ID
-//               }
-//             },
-//           ),
-//         );
-//       } else {
-//         // Switch to Facebook Ads if Google Ads failed
-//         loadFacebookRewardedAd();
-//       }
-//     } else {
-//       loadFacebookRewardedAd();
-//     }
-//   }
-
-//   void loadFacebookBannerAd() {
-//     if (facebookBannerAdIndex < facebookBannerAdIds.length) {
-//       FacebookBannerAd(
-//         placementId: facebookBannerAdIds[facebookBannerAdIndex],
-//         bannerSize: BannerSize.STANDARD,
-//         listener: (result, value) {
-//           if (result == BannerAdResult.ERROR) {
-//             facebookBannerAdIndex++;
-//             if (facebookBannerAdIndex >= facebookBannerAdIds.length) {
-//               _useGoogleAds = true;
-//               bannerAdIndex = 0;
-//               loadBannerAd(); // Switch back to Google Ads
-//             } else {
-//               loadFacebookBannerAd(); // Retry with the next Facebook ad unit ID
-//             }
-//           }
-//         },
-//       );
-//     } else {
-//       _useGoogleAds = true;
-//       bannerAdIndex = 0;
-//       loadBannerAd(); // Switch back to Google Ads
-//     }
-//   }
-
-//   void loadFacebookInterstitialAd() {
-//     if (facebookInterstitialAdIndex < facebookInterstitialAdIds.length) {
-//       FacebookInterstitialAd.loadInterstitialAd(
-//         placementId: facebookInterstitialAdIds[facebookInterstitialAdIndex],
-//         listener: (result, value) {
-//           if (result == InterstitialAdResult.ERROR) {
-//             facebookInterstitialAdIndex++;
-//             if (facebookInterstitialAdIndex >=
-//                 facebookInterstitialAdIds.length) {
-//               _useGoogleAds = true;
-//               interstitialAdIndex = 0;
-//               loadInterstitialAd(); // Switch back to Google Ads
-//             } else {
-//               loadFacebookInterstitialAd(); // Retry with the next Facebook ad unit ID
-//             }
-//           }
-//         },
-//       );
-//     } else {
-//       _useGoogleAds = true;
-//       interstitialAdIndex = 0;
-//       loadInterstitialAd(); // Switch back to Google Ads
-//     }
-//   }
-
-//   void loadFacebookRewardedAd() {
-//     if (facebookRewardedAdIndex < facebookRewardedAdIds.length) {
-//       FacebookRewardedVideoAd.loadRewardedVideoAd(
-//         placementId: facebookRewardedAdIds[facebookRewardedAdIndex],
-//         listener: (result, value) {
-//           if (result == RewardedVideoAdResult.ERROR) {
-//             facebookRewardedAdIndex++;
-//             if (facebookRewardedAdIndex >= facebookRewardedAdIds.length) {
-//               _useGoogleAds = true;
-//               rewardedAdIndex = 0;
-//               loadRewardedAd(); // Switch back to Google Ads
-//             } else {
-//               loadFacebookRewardedAd(); // Retry with the next Facebook ad unit ID
-//             }
-//           }
-//         },
-//       );
-//     } else {
-//       _useGoogleAds = true;
-//       rewardedAdIndex = 0;
-//       loadRewardedAd(); // Switch back to Google Ads
-//     }
-//   }
-
-//   void addAds(bool interstitial, bool bannerAd, bool rewardedAd) {
-//     if (interstitial) {
-//       loadInterstitialAd();
-//     }
-
-//     if (bannerAd) {
-//       loadBannerAd();
-//     }
-
-//     if (rewardedAd) {
-//       loadRewardedAd();
-//     }
-//   }
-
-//   void showInterstitial() {
-//     _interstitialAd?.show();
-//   }
-
-//   BannerAd? getBannerAd() {
-//     return _bannerAd;
-//   }
-
-//   void showRewardedAd() {
-//     if (_rewardedAd != null) {
-//       _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-//         onAdShowedFullScreenContent: (RewardedAd ad) {
-//           print("Ad onAdShowedFullScreenContent");
-//         },
-//         onAdDismissedFullScreenContent: (RewardedAd ad) {
-//           ad.dispose();
-//           loadRewardedAd();
-//         },
-//         onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
-//           ad.dispose();
-//           loadRewardedAd();
-//         },
-//       );
-
-//       _rewardedAd!.setImmersiveMode(true);
-//       _rewardedAd!.show(
-//           onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-//         print("${reward.amount} ${reward.type}");
-//       });
-//     }
-//   }
-
-//   void disposeAds() {
-//     _bannerAd?.dispose();
-//     _interstitialAd?.dispose();
-//     _rewardedAd?.dispose();
-//   }
-// }
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum RewardPlacement { hint, autoSolve }
+
 enum RewardShowResult { notReady, shown }
 
+/// Central AdMob manager — banner, interstitial, rewarded (hint / skip).
+///
+/// Non-release builds use Google **test** unit IDs so ads always fill while
+/// developing. Release builds use your production unit IDs.
 class AdManager {
+  factory AdManager() => _instance;
+  AdManager._();
+  static final AdManager _instance = AdManager._();
+
+  /// Set `true` only when you want real production ads in a debug run.
+  static const bool forceProductionAds = false;
+
+  static bool get _useTestAds =>
+      !kReleaseMode && !forceProductionAds;
+
+  // --- Production unit IDs ---
+  static const _prodBanner = [
+    'ca-app-pub-5561438827097019/5440263702',
+    'ca-app-pub-5561438827097019/9075891424',
+  ];
+  static const _prodInterstitial = [
+    'ca-app-pub-5561438827097019/5136646412',
+    'ca-app-pub-5561438827097019/1767777858',
+  ];
+  static const _prodHintRewarded = [
+    'ca-app-pub-5561438827097019/6764030149',
+    'ca-app-pub-5561438827097019/5450948476',
+    'ca-app-pub-5561438827097019/7397402617',
+    'ca-app-pub-5561438827097019/9999515220',
+    'ca-app-pub-5561438827097019/9535557351',
+    'ca-app-pub-5561438827097019/5488501134',
+    'ca-app-pub-5561438827097019/7373351887',
+  ];
+  static const _prodSkipRewarded = [
+    'ca-app-pub-5561438827097019/5683942253',
+    'ca-app-pub-5561438827097019/4283230677',
+    'ca-app-pub-5561438827097019/2824785130',
+    'ca-app-pub-5561438827097019/4747188542',
+    'ca-app-pub-5561438827097019/1657067333',
+    'ca-app-pub-5561438827097019/4175419460',
+    'ca-app-pub-5561438827097019/2121025205',
+    'ca-app-pub-5561438827097019/2862337799',
+  ];
+
+  static const _testBanner = 'ca-app-pub-3940256099942544/6300978111';
+  static const _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
+  static const _testRewarded = 'ca-app-pub-3940256099942544/5224354917';
+
+  final ValueNotifier<BannerAd?> bannerAdNotifier =
+      ValueNotifier<BannerAd?>(null);
+  /// Separate banner for gameplay (AdWidget can only host one BannerAd each).
+  final ValueNotifier<BannerAd?> playBannerAdNotifier =
+      ValueNotifier<BannerAd?>(null);
+
   BannerAd? _bannerAd;
+  BannerAd? _playBannerAd;
   InterstitialAd? _interstitialAd;
   final Map<RewardPlacement, RewardedAd?> _rewardedAds = {
     RewardPlacement.hint: null,
     RewardPlacement.autoSolve: null,
   };
 
-  final List<String> googleBannerAdIds = [
-    "ca-app-pub-5561438827097019/5440263702",
-    "ca-app-pub-5561438827097019/9075891424",
-  ];
+  int _bannerIndex = 0;
+  int _interstitialIndex = 0;
+  int _hintIndex = 0;
+  int _skipIndex = 0;
 
-  final List<String> googleInterstitialAdIds = [
-    "ca-app-pub-5561438827097019/5136646412",
-    "ca-app-pub-5561438827097019/1767777858",
-  ];
-
-  // Example rewarded ad IDs for quick testing; replace later with your own IDs.
-  final List<String> hintRewardedAdIds = [
-    "ca-app-pub-5561438827097019/6764030149",
-    "ca-app-pub-5561438827097019/5450948476",
-    "ca-app-pub-5561438827097019/7397402617",
-    "ca-app-pub-5561438827097019/9999515220",
-    "ca-app-pub-5561438827097019/9535557351",
-    "ca-app-pub-5561438827097019/5488501134",
-    "ca-app-pub-5561438827097019/7373351887",
-  ];
-  final List<String> autoSolveRewardedAdIds = [
-    "ca-app-pub-5561438827097019/5683942253",
-    "ca-app-pub-5561438827097019/4283230677",
-    "ca-app-pub-5561438827097019/2824785130",
-    "ca-app-pub-5561438827097019/4747188542 ",
-    "ca-app-pub-5561438827097019/1657067333",
-    "ca-app-pub-5561438827097019/4175419460",
-    "ca-app-pub-5561438827097019/2121025205",
-    "ca-app-pub-5561438827097019/2862337799",
-  ];
-
-  int bannerAdIndex = 0;
-  int interstitialAdIndex = 0;
-  int hintRewardedAdIndex = 0;
-  int autoSolveRewardedAdIndex = 0;
-  final Map<RewardPlacement, bool> _isRewardLoadInProgress = {
+  bool _bootstrapping = false;
+  bool _didBootstrap = false;
+  bool _bannerLoading = false;
+  bool _playBannerLoading = false;
+  bool _interstitialLoading = false;
+  final Map<RewardPlacement, bool> _rewardLoading = {
     RewardPlacement.hint: false,
     RewardPlacement.autoSolve: false,
   };
-  final Map<RewardPlacement, Completer<void>?> _rewardReadyCompleter = {
+  final Map<RewardPlacement, Completer<void>?> _rewardReady = {
     RewardPlacement.hint: null,
     RewardPlacement.autoSolve: null,
   };
+  final Map<RewardPlacement, int> _rewardFailStreak = {
+    RewardPlacement.hint: 0,
+    RewardPlacement.autoSolve: 0,
+  };
 
-  void loadBannerAd() {
-    if (bannerAdIndex < googleBannerAdIds.length) {
-      _bannerAd = BannerAd(
-        adUnitId: googleBannerAdIds[bannerAdIndex],
-        size: AdSize.banner,
-        request: const AdRequest(),
-        listener: BannerAdListener(
-          onAdFailedToLoad: (Ad ad, LoadAdError error) {
-            bannerAdIndex++;
-            if (bannerAdIndex < googleBannerAdIds.length) {
-              loadBannerAd();
-            }
-          },
+  List<String> get _bannerIds =>
+      _useTestAds ? const [_testBanner] : _prodBanner;
+  List<String> get _interstitialIds =>
+      _useTestAds ? const [_testInterstitial] : _prodInterstitial;
+  List<String> get _hintIds =>
+      _useTestAds ? const [_testRewarded] : _prodHintRewarded;
+  List<String> get _skipIds =>
+      _useTestAds ? const [_testRewarded] : _prodSkipRewarded;
+
+  /// Call after the first Flutter frame (Activity must be ready).
+  Future<void> bootstrap({
+    bool interstitial = true,
+    bool banner = true,
+    bool rewarded = true,
+  }) async {
+    if (_bootstrapping) return;
+    _bootstrapping = true;
+    try {
+      print('[Ads] bootstrap… testAds=$_useTestAds release=$kReleaseMode');
+
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          tagForChildDirectedTreatment:
+              TagForChildDirectedTreatment.unspecified,
+          // Empty list is fine — test ad *unit* IDs already force test creatives.
+          testDeviceIds: const <String>[],
         ),
       );
 
-      _bannerAd?.load();
-    }
-  }
+      // Let the Activity / platform view settle after first frame.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
 
-  void loadInterstitialAd() {
-    if (interstitialAdIndex < googleInterstitialAdIds.length) {
-      InterstitialAd.load(
-        adUnitId: googleInterstitialAdIds[interstitialAdIndex],
-        request: const AdRequest(),
-        adLoadCallback: InterstitialAdLoadCallback(
-          onAdLoaded: (InterstitialAd ad) {
-            _interstitialAd = ad;
-            ad.fullScreenContentCallback = FullScreenContentCallback(
-              onAdDismissedFullScreenContent: (InterstitialAd ad) {
-                ad.dispose();
-                loadInterstitialAd();
-              },
-              onAdFailedToShowFullScreenContent:
-                  (InterstitialAd ad, AdError error) {
-                ad.dispose();
-                loadInterstitialAd();
-              },
-            );
-          },
-          onAdFailedToLoad: (LoadAdError error) {
-            interstitialAdIndex++;
-            if (interstitialAdIndex < googleInterstitialAdIds.length) {
-              loadInterstitialAd();
-            }
-          },
-        ),
-      );
-    }
-  }
-
-  void _loadRewardedAd(RewardPlacement placement) {
-    if (_isRewardLoadInProgress[placement] == true) {
-      return;
-    }
-    _isRewardLoadInProgress[placement] = true;
-    final ids = placement == RewardPlacement.hint
-        ? hintRewardedAdIds
-        : autoSolveRewardedAdIds;
-    if (ids.isEmpty) {
-      _isRewardLoadInProgress[placement] = false;
-      return;
-    }
-
-    var currentIndex = placement == RewardPlacement.hint
-        ? hintRewardedAdIndex % ids.length
-        : autoSolveRewardedAdIndex % ids.length;
-
-    void attemptLoad() {
-      if (_rewardedAds[placement] != null) {
-        _isRewardLoadInProgress[placement] = false;
-        _rewardReadyCompleter[placement]?.complete();
-        _rewardReadyCompleter[placement] = null;
-        return;
+      _didBootstrap = true;
+      if (banner) {
+        _bannerLoading = false;
+        _playBannerLoading = false;
+        loadBannerAd(force: true);
+        loadPlayBannerAd(force: true);
       }
-
-      RewardedAd.load(
-        adUnitId: ids[currentIndex].trim(),
-        request: const AdRequest(),
-        rewardedAdLoadCallback: RewardedAdLoadCallback(
-          onAdLoaded: (RewardedAd ad) {
-            _rewardedAds[placement]?.dispose();
-            _rewardedAds[placement] = ad;
-            _isRewardLoadInProgress[placement] = false;
-            _rewardReadyCompleter[placement]?.complete();
-            _rewardReadyCompleter[placement] = null;
-          },
-          onAdFailedToLoad: (LoadAdError error) {
-            currentIndex = (currentIndex + 1) % ids.length;
-            if (placement == RewardPlacement.hint) {
-              hintRewardedAdIndex = currentIndex;
-            } else {
-              autoSolveRewardedAdIndex = currentIndex;
-            }
-            Future<void>.delayed(const Duration(milliseconds: 700), attemptLoad);
-          },
-        ),
-      );
+      if (interstitial) {
+        _interstitialLoading = false;
+        loadInterstitialAd(force: true);
+      }
+      if (rewarded) prefetchRewardedAds();
+    } catch (e, st) {
+      print('[Ads] bootstrap error: $e\n$st');
+      _didBootstrap = false;
+    } finally {
+      _bootstrapping = false;
     }
-
-    attemptLoad();
   }
 
   void addAds(bool interstitial, bool bannerAd, bool rewardedAd) {
-    if (interstitial) {
-      loadInterstitialAd();
-    }
-    if (bannerAd) {
-      loadBannerAd();
-    }
-    if (rewardedAd) {
-      prefetchRewardedAds();
-    }
+    unawaited(
+      bootstrap(
+        interstitial: interstitial,
+        banner: bannerAd,
+        rewarded: rewardedAd,
+      ),
+    );
   }
 
-  void showInterstitial() {
-    _interstitialAd?.show();
-  }
-
-  BannerAd? getBannerAd() {
-    return _bannerAd;
-  }
-
-  void prefetchRewardedAds() {
-    _rewardReadyCompleter[RewardPlacement.hint] ??= Completer<void>();
-    _rewardReadyCompleter[RewardPlacement.autoSolve] ??= Completer<void>();
-    if (_rewardedAds[RewardPlacement.hint] == null) {
-      _loadRewardedAd(RewardPlacement.hint);
-    } else if (!(_rewardReadyCompleter[RewardPlacement.hint]?.isCompleted ??
-        true)) {
-      _rewardReadyCompleter[RewardPlacement.hint]?.complete();
-      _rewardReadyCompleter[RewardPlacement.hint] = null;
-    }
-    if (_rewardedAds[RewardPlacement.autoSolve] == null) {
-      _loadRewardedAd(RewardPlacement.autoSolve);
-    } else if (!(_rewardReadyCompleter[RewardPlacement.autoSolve]?.isCompleted ??
-        true)) {
-      _rewardReadyCompleter[RewardPlacement.autoSolve]?.complete();
-      _rewardReadyCompleter[RewardPlacement.autoSolve] = null;
-    }
-  }
-
-  Future<void> waitUntilRewardedAdIsReady(RewardPlacement placement) async {
-    if (_rewardedAds[placement] != null) {
+  void ensureLoaded() {
+    if (!_didBootstrap) {
+      unawaited(bootstrap());
       return;
     }
-    _rewardReadyCompleter[placement] ??= Completer<void>();
+    if (_bannerAd == null && !_bannerLoading) loadBannerAd();
+    if (_playBannerAd == null && !_playBannerLoading) loadPlayBannerAd();
+    if (_interstitialAd == null && !_interstitialLoading) {
+      loadInterstitialAd();
+    }
+    prefetchRewardedAds();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Banner
+  // ---------------------------------------------------------------------------
+
+  void loadBannerAd({bool force = false}) {
+    if (_bannerLoading && !force) return;
+    if (_bannerAd != null && !force) return;
+
+    final ids = _bannerIds;
+    if (ids.isEmpty) return;
+    if (_bannerIndex >= ids.length) _bannerIndex = 0;
+
+    _bannerLoading = true;
+    final unitId = ids[_bannerIndex].trim();
+    print('[Ads] loading banner: $unitId');
+
+    final ad = BannerAd(
+      adUnitId: unitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (Ad loaded) {
+          _bannerLoading = false;
+          final banner = loaded as BannerAd;
+          final old = _bannerAd;
+          _bannerAd = banner;
+          bannerAdNotifier.value = banner;
+          old?.dispose();
+          print('[Ads] banner LOADED ✓ $unitId');
+        },
+        onAdFailedToLoad: (Ad failed, LoadAdError error) {
+          print('[Ads] banner FAILED ✗ $unitId → $error');
+          failed.dispose();
+          _bannerLoading = false;
+          if (_bannerAd != null) {
+            _bannerAd?.dispose();
+            _bannerAd = null;
+            bannerAdNotifier.value = null;
+          }
+          _bannerIndex++;
+          if (_bannerIndex < ids.length) {
+            Future<void>.delayed(
+              const Duration(milliseconds: 800),
+              () => loadBannerAd(force: true),
+            );
+          } else {
+            _bannerIndex = 0;
+            Future<void>.delayed(
+              const Duration(seconds: 20),
+              () => loadBannerAd(force: true),
+            );
+          }
+        },
+      ),
+    );
+
+    // Safety: if SDK never callbacks (broken plugin channel), unlock loader.
+    Future<void>.delayed(const Duration(seconds: 30), () {
+      if (_bannerLoading && _bannerAd == null) {
+        print('[Ads] banner load timeout — retrying');
+        _bannerLoading = false;
+        loadBannerAd(force: true);
+      }
+    });
+
+    ad.load();
+  }
+
+  /// Gameplay-only banner (separate instance from the shell banner).
+  void loadPlayBannerAd({bool force = false}) {
+    if (_playBannerLoading && !force) return;
+    if (_playBannerAd != null && !force) return;
+
+    final ids = _bannerIds;
+    if (ids.isEmpty) return;
+    // Prefer second unit if available so shell/play don't share one.
+    final unitId = ids[ids.length > 1 ? 1 % ids.length : 0].trim();
+    // With a single test id, still fine to request twice.
+
+    _playBannerLoading = true;
+    print('[Ads] loading play banner: $unitId');
+
+    final ad = BannerAd(
+      adUnitId: unitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (Ad loaded) {
+          _playBannerLoading = false;
+          final banner = loaded as BannerAd;
+          final old = _playBannerAd;
+          _playBannerAd = banner;
+          playBannerAdNotifier.value = banner;
+          old?.dispose();
+          print('[Ads] play banner LOADED ✓ $unitId');
+        },
+        onAdFailedToLoad: (Ad failed, LoadAdError error) {
+          print('[Ads] play banner FAILED ✗ $unitId → $error');
+          failed.dispose();
+          _playBannerLoading = false;
+          _playBannerAd?.dispose();
+          _playBannerAd = null;
+          playBannerAdNotifier.value = null;
+          Future<void>.delayed(
+            const Duration(seconds: 20),
+            () => loadPlayBannerAd(force: true),
+          );
+        },
+      ),
+    );
+    ad.load();
+  }
+
+  BannerAd? getBannerAd() => _bannerAd;
+
+  // ---------------------------------------------------------------------------
+  // Interstitial
+  // ---------------------------------------------------------------------------
+
+  void loadInterstitialAd({bool force = false}) {
+    if ((_interstitialLoading || _interstitialAd != null) && !force) return;
+    final ids = _interstitialIds;
+    if (ids.isEmpty) return;
+    if (_interstitialIndex >= ids.length) _interstitialIndex = 0;
+
+    _interstitialLoading = true;
+    final unitId = ids[_interstitialIndex].trim();
+    print('[Ads] loading interstitial: $unitId');
+
+    InterstitialAd.load(
+      adUnitId: unitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (InterstitialAd ad) {
+          _interstitialLoading = false;
+          _interstitialAd?.dispose();
+          _interstitialAd = ad;
+          print('[Ads] interstitial LOADED ✓ $unitId');
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('[Ads] interstitial FAILED ✗ $unitId → $error');
+          _interstitialLoading = false;
+          _interstitialAd = null;
+          _interstitialIndex++;
+          if (_interstitialIndex < ids.length) {
+            Future<void>.delayed(
+              const Duration(milliseconds: 800),
+              () => loadInterstitialAd(force: true),
+            );
+          } else {
+            _interstitialIndex = 0;
+            Future<void>.delayed(
+              const Duration(seconds: 20),
+              () => loadInterstitialAd(force: true),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  bool get isInterstitialReady => _interstitialAd != null;
+
+  Future<bool> showInterstitial() async {
+    final ad = _interstitialAd;
+    if (ad == null) {
+      loadInterstitialAd(force: true);
+      return false;
+    }
+
+    final done = Completer<void>();
+    _interstitialAd = null;
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (InterstitialAd ad) {
+        ad.dispose();
+        loadInterstitialAd(force: true);
+        if (!done.isCompleted) done.complete();
+      },
+      onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+        print('[Ads] interstitial show failed: $error');
+        ad.dispose();
+        loadInterstitialAd(force: true);
+        if (!done.isCompleted) done.complete();
+      },
+    );
+
+    try {
+      await ad.show();
+      await done.future.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {},
+      );
+      return true;
+    } catch (e) {
+      print('[Ads] interstitial show error: $e');
+      ad.dispose();
+      loadInterstitialAd(force: true);
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rewarded
+  // ---------------------------------------------------------------------------
+
+  void prefetchRewardedAds() {
+    try {
+      // Serialize loads — concurrent requests for the same test unit hang/fail.
+      _loadRewardedAd(RewardPlacement.hint);
+      Future<void>.delayed(const Duration(milliseconds: 600), () {
+        _loadRewardedAd(RewardPlacement.autoSolve);
+      });
+    } catch (e) {
+      print('[Ads] prefetch rewarded error: $e');
+    }
+  }
+
+  bool get _rewardLoadInFlight =>
+      _rewardLoading.values.any((v) => v == true);
+
+  void _loadRewardedAd(RewardPlacement placement) {
+    if (_rewardedAds[placement] != null) return;
+    if (_rewardLoading[placement] == true) return;
+    // One RewardedAd.load at a time (esp. test unit shared by both placements).
+    if (_rewardLoadInFlight) {
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        _loadRewardedAd(placement);
+      });
+      return;
+    }
+
+    final ids =
+        placement == RewardPlacement.hint ? _hintIds : _skipIds;
+    if (ids.isEmpty) return;
+
+    final streak = _rewardFailStreak[placement] ?? 0;
+    if (streak >= ids.length * 2) {
+      _rewardFailStreak[placement] = 0;
+      Future<void>.delayed(
+        const Duration(seconds: 30),
+        () => _loadRewardedAd(placement),
+      );
+      return;
+    }
+
+    _rewardLoading[placement] = true;
+    var index = placement == RewardPlacement.hint ? _hintIndex : _skipIndex;
+    index = index % ids.length;
+    final unitId = ids[index].trim();
+    print('[Ads] loading rewarded ($placement): $unitId');
+
+    RewardedAd.load(
+      adUnitId: unitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (RewardedAd ad) {
+          _rewardedAds[placement]?.dispose();
+          _rewardedAds[placement] = ad;
+          _rewardLoading[placement] = false;
+          _rewardFailStreak[placement] = 0;
+          _completeRewardReady(placement);
+          print('[Ads] rewarded LOADED ✓ ($placement)');
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('[Ads] rewarded FAILED ✗ ($placement / $unitId): $error');
+          _rewardLoading[placement] = false;
+          _rewardFailStreak[placement] = streak + 1;
+          final next = (index + 1) % ids.length;
+          if (placement == RewardPlacement.hint) {
+            _hintIndex = next;
+          } else {
+            _skipIndex = next;
+          }
+          // Unblock waiters so UI can retry / dismiss loader.
+          _completeRewardReady(placement);
+          Future<void>.delayed(
+            Duration(milliseconds: 800 + (streak * 250).clamp(0, 3000)),
+            () => _loadRewardedAd(placement),
+          );
+        },
+      ),
+    );
+  }
+
+  void _completeRewardReady(RewardPlacement placement) {
+    final c = _rewardReady[placement];
+    if (c != null && !c.isCompleted) c.complete();
+    _rewardReady[placement] = null;
+  }
+
+  /// In test mode both placements share one unit — borrow a ready ad.
+  RewardedAd? _takeReadyRewarded(RewardPlacement placement) {
+    final own = _rewardedAds[placement];
+    if (own != null) {
+      _rewardedAds[placement] = null;
+      return own;
+    }
+    if (_useTestAds) {
+      for (final other in RewardPlacement.values) {
+        if (other == placement) continue;
+        final borrowed = _rewardedAds[other];
+        if (borrowed != null) {
+          _rewardedAds[other] = null;
+          return borrowed;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> waitUntilRewardedAdIsReady(
+    RewardPlacement placement, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    if (_takePeekRewarded(placement) != null) return;
+
+    _rewardReady[placement] ??= Completer<void>();
     _loadRewardedAd(placement);
-    await _rewardReadyCompleter[placement]!.future;
+
+    try {
+      await _rewardReady[placement]!.future.timeout(timeout);
+    } on TimeoutException {
+      print('[Ads] rewarded wait timeout ($placement)');
+      _completeRewardReady(placement);
+    }
+  }
+
+  RewardedAd? _takePeekRewarded(RewardPlacement placement) {
+    if (_rewardedAds[placement] != null) return _rewardedAds[placement];
+    if (_useTestAds) {
+      for (final other in RewardPlacement.values) {
+        if (_rewardedAds[other] != null) return _rewardedAds[other];
+      }
+    }
+    return null;
   }
 
   Future<RewardShowResult> showRewardedAdForPlacement(
     RewardPlacement placement, {
     required void Function() onRewardEarned,
   }) async {
-    final ad = _rewardedAds[placement];
+    final ad = _takeReadyRewarded(placement);
     if (ad == null) {
       _loadRewardedAd(placement);
       return RewardShowResult.notReady;
     }
 
-    var didEarnReward = false;
+    var didEarn = false;
+    final done = Completer<void>();
+
     ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        if (didEarnReward) {
-          onRewardEarned();
+      onAdDismissedFullScreenContent: (RewardedAd ad) {
+        if (didEarn) {
+          try {
+            onRewardEarned();
+          } catch (e) {
+            print('[Ads] reward callback error: $e');
+          }
         }
         ad.dispose();
-        _rewardedAds[placement] = null;
+        if (!done.isCompleted) done.complete();
         _loadRewardedAd(placement);
       },
-      onAdFailedToShowFullScreenContent: (ad, error) {
+      onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
+        print('[Ads] rewarded show failed: $error');
         ad.dispose();
-        _rewardedAds[placement] = null;
+        if (!done.isCompleted) done.complete();
         _loadRewardedAd(placement);
       },
     );
-    ad.setImmersiveMode(true);
-    await ad.show(
-      onUserEarnedReward: (adWithoutView, reward) {
-        didEarnReward = true;
-      },
-    );
-    return RewardShowResult.shown;
+
+    try {
+      await ad.show(
+        onUserEarnedReward: (_, __) {
+          didEarn = true;
+        },
+      );
+      // Wait until the native fullscreen is closed (or failed), with a cap.
+      await done.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {},
+      );
+      return didEarn || true
+          ? RewardShowResult.shown
+          : RewardShowResult.shown;
+    } catch (e) {
+      print('[Ads] rewarded show error: $e');
+      ad.dispose();
+      if (!done.isCompleted) done.complete();
+      _loadRewardedAd(placement);
+      return RewardShowResult.notReady;
+    }
   }
 
   void showRewardedAd() {
-    showRewardedAdForPlacement(
-      RewardPlacement.hint,
-      onRewardEarned: () {},
+    unawaited(
+      showRewardedAdForPlacement(
+        RewardPlacement.hint,
+        onRewardEarned: () {},
+      ),
     );
   }
 
-  void disposeAds() {
+  void disposeAds() {}
+
+  void disposeAll() {
     _bannerAd?.dispose();
+    _bannerAd = null;
+    bannerAdNotifier.value = null;
+    _playBannerAd?.dispose();
+    _playBannerAd = null;
+    playBannerAdNotifier.value = null;
     _interstitialAd?.dispose();
-    for (final ad in _rewardedAds.values) {
-      ad?.dispose();
+    _interstitialAd = null;
+    for (final p in RewardPlacement.values) {
+      _rewardedAds[p]?.dispose();
+      _rewardedAds[p] = null;
+      _rewardLoading[p] = false;
+      _completeRewardReady(p);
     }
-    for (final placement in RewardPlacement.values) {
-      if (!(_rewardReadyCompleter[placement]?.isCompleted ?? true)) {
-        _rewardReadyCompleter[placement]?.complete();
-      }
-      _rewardReadyCompleter[placement] = null;
-    }
+    _didBootstrap = false;
+    _bannerLoading = false;
+    _playBannerLoading = false;
+    _interstitialLoading = false;
   }
 }

@@ -96,6 +96,8 @@ class _BackgroundPuzzleControllerState extends State<BackgroundPuzzleController>
               sharpWalls: const [],
             ),
           ),
+          // Auto-looping decorative puzzle — must NOT trigger GameFeel.
+          enableFeel: false,
         )..add(MoveAttempt(moves[moveIndex++]));
       },
       child: BlocListener<LevelBloc, LevelState>(

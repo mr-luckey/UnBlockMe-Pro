@@ -6,7 +6,7 @@ publish_to: "none"
 version: 7.0.2
 
 environment:
-  sdk: ">=2.15.1 <3.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -14,6 +14,7 @@ dependencies:
   adaptive_theme: ^3.7.2
   archive: ^4.0.9
   async: ^2.13.1
+  audio_session: ^0.2.2
   get: ^4.7.3
   google_mobile_ads: ^8.0.0
   cupertino_icons: ^1.0.9
@@ -26,15 +27,8 @@ dependencies:
   shared_preferences: ^2.0.1
   google_fonts: ^8.1.0
   yaml: ^3.1.0
-  assets_audio_player: ^3.1.1
-  # easy_audience_network: ^0.0.7
-  # facebook_audience_network: ^1.0.1
+  just_audio: ^0.10.4
   win32: ^5.5.4
-  # assets_audio_player_web: ^3.1.1
-  # Disabled: this package ships Android Kotlin code using removed Registrar API.
-  # assets_audio_player_web: ^3.1.1
-
-
 
 dev_dependencies:
   flutter_test:
@@ -43,10 +37,6 @@ dev_dependencies:
   flutter_lints: ^1.0.0
 
 dependency_overrides:
-  assets_audio_player_web:
-    path: vendor/assets_audio_player_web_stub
-  # assets_audio_player pulls an old Android implementation that still references
-  # PluginRegistry.Registrar (removed with v1 embedding cleanup).
   path_provider_android: ^2.3.1
   path_provider: ^2.1.5
 
@@ -55,4 +45,13 @@ flutter:
 
   assets:
     - assets/
-    - assets/audio/bmusic.mp3
+    - assets/audio/bgm_forest.wav
+    - assets/audio/sfx_hit.wav
+    - assets/audio/sfx_slide.wav
+    - assets/audio/sfx_tap.wav
+    - assets/audio/sfx_win.wav
+    - assets/ui/
+    - assets/ui/home/
+    - assets/ui/map/
+    - assets/ui/play/
+    - assets/ui/complete/

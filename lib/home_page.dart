@@ -1,576 +1,425 @@
-import 'package:assets_audio_player/assets_audio_player.dart';
-import 'package:blocked/background/background.dart';
-import 'package:blocked/level/level.dart';
+import 'dart:async';
+
+import 'package:blocked/ADs/ad_manager.dart';
+import 'package:blocked/audio/game_feel.dart';
+import 'package:blocked/audio/game_music.dart';
+import 'package:blocked/models/models.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/routing/routing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import 'package:blocked/widgets/app_bottom_nav.dart';
-import 'ADs/ad_manager.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+/// Home: dense forest layout — logo, board, stats, Play CTA, wood nav (shell).
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key, required this.chapters}) : super(key: key);
+
+  final List<LevelChapter> chapters;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  Widget build(BuildContext context) {
+    return _HomeView(chapters: chapters);
+  }
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  final assetsAudioPlayer = AssetsAudioPlayer();
+class _HomeView extends StatefulWidget {
+  const _HomeView({required this.chapters});
+
+  final List<LevelChapter> chapters;
+
+  @override
+  State<_HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<_HomeView> {
   final adManager = AdManager();
-  bool isMuted = false;
+  bool _openingLevel = false;
+
+  static const _assets = 'assets/ui/home';
 
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, false);
-
-    assetsAudioPlayer.open(
-      Audio('assets/audio/bmusic.mp3'),
-      autoStart: true,
-      volume: 1.0,
-      loopMode: LoopMode.playlist,
-    );
-    WidgetsBinding.instance.addObserver(this);
+    adManager.ensureLoaded();
+    // Silent SFX unlock while Home is idle — first button tap stays instant.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(GameFeel.instance.prewarm());
+    });
   }
 
-  Future<int> _totalLevelCount() async {
-    final chapters = await readLevelsFromYaml();
-    return chapters.fold<int>(0, (sum, chapter) => sum + chapter.levels.length);
+  Future<void> _play() async {
+    if (_openingLevel) return;
+    _openingLevel = true;
+    try {
+      GameFeel.instance.tap();
+      final level = await getFirstUncompletedLevel(widget.chapters);
+      if (!mounted) return;
+      if (level[0].isEmpty) return;
+      // Navigate immediately — never await audio warm-up here.
+      context.read<NavigatorCubit>().navigateToLevel(level[0], level[1]);
+    } finally {
+      _openingLevel = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final h = size.height;
+    final w = size.width;
+    final s = (h / 840).clamp(0.82, 1.15);
+    final side = (w * 0.055).clamp(18.0, 28.0);
+
+    final logoH = (h * 0.13).clamp(96.0, 128.0);
+    final playH = (h * 0.125).clamp(92.0, 118.0);
+    final gap = (6.0 * s).clamp(4.0, 9.0);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.12),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.18),
+                  ],
+                  stops: const [0, 0.35, 1],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              Expanded(
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(side, 4, side, gap),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: GameMusic.instance.muted,
+                            builder: (context, muted, _) {
+                              return _MuteChip(
+                                muted: muted,
+                                onTap: () {
+                                  GameFeel.instance.tap();
+                                  GameMusic.instance.toggleMute();
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(height: gap * 0.4),
+                        Image.asset(
+                          '$_assets/logo.png',
+                          height: logoH,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                          gaplessPlayback: true,
+                        ),
+                        SizedBox(height: gap),
+                        Expanded(
+                          flex: 5,
+                          child: Center(
+                            child: Image.asset(
+                              '$_assets/puzzle_preview.png',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              gaplessPlayback: true,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: gap),
+                        StreamBuilder<PlayerProgress>(
+                          stream: playerProgressStream(),
+                          builder: (context, snapshot) {
+                            final p = snapshot.data ??
+                                const PlayerProgress(
+                                  totalStars: 0,
+                                  levelsSolved: 0,
+                                  currentStreak: 0,
+                                  bestStreak: 0,
+                                );
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    scale: s,
+                                    iconAsset: '$_assets/icon_flame.png',
+                                    label: 'STREAK',
+                                    value: '${p.currentStreak}',
+                                    colors: const [
+                                      Color(0xFFB07BFF),
+                                      Color(0xFF7A35E8),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: gap + 2),
+                                Expanded(
+                                  child: _StatCard(
+                                    scale: s,
+                                    iconAsset: '$_assets/icon_trophy.png',
+                                    label: 'SOLVED',
+                                    value: '${p.levelsSolved}',
+                                    colors: const [
+                                      Color(0xFF5CB0FF),
+                                      Color(0xFF1A75E8),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: gap + 2),
+                                Expanded(
+                                  child: _StatCard(
+                                    scale: s,
+                                    iconAsset: '$_assets/icon_star.png',
+                                    label: 'STARS',
+                                    value: '${p.totalStars}',
+                                    colors: const [
+                                      Color(0xFFFFD954),
+                                      Color(0xFFE8A500),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        SizedBox(height: gap + 4),
+                        _CtaButton(
+                          asset: '$_assets/btn_play.png',
+                          height: playH,
+                          onTap: _play,
+                          semanticLabel: 'Play',
+                        ),
+                        SizedBox(height: gap + 4),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MuteChip extends StatelessWidget {
+  const _MuteChip({required this.muted, required this.onTap});
+  final bool muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF8B5A2B), Color(0xFF3A2210)],
+            ),
+            border: Border.all(color: const Color(0xFFC4A574), width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(
+            muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            color: const Color(0xFFFFF1D6),
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.scale,
+    required this.iconAsset,
+    required this.label,
+    required this.value,
+    required this.colors,
+  });
+
+  final double scale;
+  final String iconAsset;
+  final String label;
+  final String value;
+  final List<Color> colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconH = (30.0 * scale).clamp(26.0, 36.0);
+    final labelSize = (10.5 * scale).clamp(9.5, 12.0);
+    final valueSize = (24.0 * scale).clamp(20.0, 28.0);
+    final radius = (18.0 * scale).clamp(14.0, 22.0);
+    final vPad = (10.0 * scale).clamp(8.0, 13.0);
+
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: vPad, horizontal: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: colors,
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 2.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.last.withValues(alpha: 0.45),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(iconAsset, height: iconH, fit: BoxFit.contain),
+          SizedBox(height: 2 * scale),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.nunito(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: labelSize,
+              letterSpacing: 0.5,
+              height: 1.05,
+            ),
+          ),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.nunito(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: valueSize,
+              height: 1.05,
+              shadows: const [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 1),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-width CTA with press scale — fills the home screen properly.
+class _CtaButton extends StatefulWidget {
+  const _CtaButton({
+    required this.asset,
+    required this.height,
+    required this.onTap,
+    required this.semanticLabel,
+  });
+
+  final String asset;
+  final double height;
+  final VoidCallback onTap;
+  final String semanticLabel;
+
+  @override
+  State<_CtaButton> createState() => _CtaButtonState();
+}
+
+class _CtaButtonState extends State<_CtaButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press;
+
+  @override
+  void initState() {
+    super.initState();
+    _press = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+      lowerBound: 0.96,
+      upperBound: 1,
+      value: 1,
+    );
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    assetsAudioPlayer.dispose();
-    adManager.disposeAds();
+    _press.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !isMuted) {
-      assetsAudioPlayer.play();
-    } else {
-      assetsAudioPlayer.pause();
-    }
-  }
-
-  void toggleMute() {
-    setState(() {
-      isMuted = !isMuted;
-    });
-
-    if (isMuted) {
-      assetsAudioPlayer.setVolume(0.0);
-    } else {
-      assetsAudioPlayer.setVolume(1.0);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
-    return Scaffold(
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const AppBottomNav(current: AppBottomTab.home),
-        ],
-      ),
-      body: Stack(
-        children: [
-          const RotatingPuzzleBackground(),
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 36, 20, 20),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Hero(
-                      tag: 'app_title',
-                      child: Text('BLOCKED', style: textTheme.displayMedium),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'SLIDE PUZZLE GAME',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    StreamBuilder<PlayerProgress>(
-                      stream: playerProgressStream(),
-                      builder: (context, snapshot) {
-                        final progress = snapshot.data ??
-                            const PlayerProgress(
-                              totalStars: 0,
-                              levelsSolved: 0,
-                              currentStreak: 0,
-                              bestStreak: 0,
-                            );
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: _InfoTile(
-                                icon: Icons.local_fire_department_rounded,
-                                label: 'Streak',
-                                value: '${progress.currentStreak}',
-                                tint: scheme.primaryContainer,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _InfoTile(
-                                icon: Icons.emoji_events_rounded,
-                                label: 'Solved',
-                                value: '${progress.levelsSolved}',
-                                tint: scheme.secondaryContainer,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _InfoTile(
-                                icon: Icons.star_rounded,
-                                label: 'Stars',
-                                value: '${progress.totalStars}',
-                                tint: scheme.tertiaryContainer,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    StreamBuilder<PlayerProgress>(
-                      stream: playerProgressStream(),
-                      builder: (context, snapshot) {
-                        final progress = snapshot.data ??
-                            const PlayerProgress(
-                              totalStars: 0,
-                              levelsSolved: 0,
-                              currentStreak: 0,
-                              bestStreak: 0,
-                            );
-                        return FutureBuilder<int>(
-                          future: _totalLevelCount(),
-                          builder: (context, totalSnapshot) {
-                            final totalLevels = totalSnapshot.data ?? 1;
-                            final ratio = totalLevels == 0
-                                ? 0.0
-                                : progress.levelsSolved / totalLevels;
-                            return _OverallProgressCard(
-                              solved: progress.levelsSolved,
-                              totalLevels: totalLevels,
-                              totalStars: progress.totalStars,
-                              ratio: ratio.clamp(0.0, 1.0),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FutureBuilder<List<String>>(
-                      future: getFirstUncompletedLevel(),
-                      builder: (context, snapshot) {
-                        final next =
-                            snapshot.data ?? const ['Basic 1', 'B_1-1'];
-                        return _ContinueCard(
-                          chapterName: next[0],
-                          levelName: next[1],
-                          onPlay: () {
-                            context
-                                .read<NavigatorCubit>()
-                                .navigateToLevel(next[0], next[1]);
-                          },
-                        );
-                      },
-                    ),
-                    // Hidden by request:
-                    // Level / Editor / Settings / Stats quick cards.
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: toggleMute,
-        shape: const CircleBorder(),
-        child: Icon(
-          isMuted ? Icons.volume_off : Icons.volume_up,
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.tint,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color tint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: tint,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 18),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.tertiary,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ContinueCard extends StatelessWidget {
-  const _ContinueCard({
-    required this.chapterName,
-    required this.levelName,
-    required this.onPlay,
-  });
-
-  final String chapterName;
-  final String levelName;
-  final VoidCallback onPlay;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primaryContainer,
-            Theme.of(context).colorScheme.secondaryContainer,
-          ],
-        ),
-        border: Border.all(color: Theme.of(context).colorScheme.primary),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CONTINUE PLAYING',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  letterSpacing: 3,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(levelName, style: Theme.of(context).textTheme.displaySmall),
-          const SizedBox(height: 4),
-          Text(
-            '$chapterName - Move the main block to exit',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text('☆☆☆', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 280,
-            child: ElevatedButton.icon(
-              icon: const Icon(MdiIcons.play),
-              label: const Text('Play Level'),
-              onPressed: onPlay,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OverallProgressCard extends StatelessWidget {
-  const _OverallProgressCard({
-    required this.solved,
-    required this.totalLevels,
-    required this.totalStars,
-    required this.ratio,
-  });
-
-  final int solved;
-  final int totalLevels;
-  final int totalStars;
-  final double ratio;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.secondary,
-                        Theme.of(context).colorScheme.tertiary,
-                      ],
-                    ),
-                  ),
-                  child: Icon(Icons.sports_esports,
-                      color: Theme.of(context).colorScheme.onPrimary, size: 30),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Puzzle Master',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontSize: 15),
-                      ),
-                      Text(
-                        'Solved $solved of $totalLevels levels',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: Theme.of(context).colorScheme.secondary),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    '$totalStars ⭐',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontSize: 15),
-                  ),
+    return Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _press.reverse(),
+        onTapCancel: () => _press.forward(),
+        onTap: () {
+          _press.forward();
+          widget.onTap();
+        },
+        child: ScaleTransition(
+          scale: _press,
+          child: Container(
+            width: double.infinity,
+            height: widget.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(widget.height / 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text('Overall Progress',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 10,
-                      fontWeight: FontWeight.normal,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    )),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 10,
-              ),
+            child: Image.asset(
+              widget.asset,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              alignment: Alignment.center,
+              gaplessPlayback: true,
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
-
-
-
-
-
-// import 'package:assets_audio_player/assets_audio_player.dart';
-// // import 'package:audioplayers/audioplayers.dart';
-// import 'package:blocked/background/background.dart';
-// import 'package:blocked/progress/progress.dart';
-// import 'package:blocked/routing/routing.dart';
-// import 'package:flutter/material.dart';
-// // import 'package:flex_color_scheme/flex_color_scheme.dart';
-// // import 'package:google_fonts/google_fonts.dart';
-// // import 'package:adaptive_theme/adaptive_theme.dart';
-// // import 'package:blocked/models/models.dart';
-// // import 'package:blocked/level/level.dart';
-// // import 'package:blocked/settings/settings.dart';
-// // import 'package:blocked/ADs/google%20ads%20integration.dart';
-// // import 'package:blocked/routing/routing.dart';
-// // import 'package:blocked/settings/settings.dart';
-// // import 'package:flex_color_scheme/flex_color_scheme.dart';
-// // import 'package:flutter/material.dart';
-// import 'package:flutter_bloc/flutter_bloc.dart';
-// import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-//
-// import 'ADs/google ads integration.dart';
-//
-// // import 'ADs/google ads integration.dart';
-//
-//
-// class HomePage extends StatefulWidget {
-//   const HomePage({Key? key}) : super(key: key);
-//
-//   @override
-//   State<HomePage> createState() => _HomePageState();
-// }
-//
-//
-// @override
-//
-// class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
-//   final assetsAudioPlayer = AssetsAudioPlayer();
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//
-//     assetsAudioPlayer.open(
-//       Audio('assets/audio/bmusic.mp3'),
-//       autoStart: true,
-//         volume: 1.0,
-//         loopMode: LoopMode.playlist,
-//     );
-//     WidgetsBinding.instance.addObserver(this);
-//   }
-//
-//
-//   @override
-//   void dispose() {
-//     WidgetsBinding.instance.removeObserver(this);
-//     assetsAudioPlayer.dispose();
-//     super.dispose();
-//   }
-//
-//   @override
-//   void didChangeAppLifecycleState(AppLifecycleState state) {
-//     if (state == AppLifecycleState.resumed) {
-//       assetsAudioPlayer.play();
-//     } else {
-//       assetsAudioPlayer.pause();
-//     }
-//   }
-//
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       bottomNavigationBar: MyHomePage(),
-//       body: Stack(
-//         children: [
-//           const RotatingPuzzleBackground(),
-//           Center(
-//             child: SingleChildScrollView(
-//               child: Center(
-//                 child: ConstrainedBox(
-//                   constraints: const BoxConstraints(maxWidth: 300),
-//                   child: Padding(
-//                     padding: const EdgeInsets.all(16.0),
-//                     child: Column(
-//                       crossAxisAlignment: CrossAxisAlignment.stretch,
-//                       mainAxisAlignment: MainAxisAlignment.center,
-//                       children: [
-//                         Hero(
-//                           tag: 'app_title',
-//                           child: Center(
-//                             child: Text('Blocked',
-//                                 style: Theme.of(context).textTheme.displayMedium),
-//                           ),
-//                         ),
-//                         const SizedBox(height: 32),
-//                         StreamBuilder<bool>(
-//                           stream: hasProgressStream(),
-//                           builder: (context, snapshot) {
-//                             final hasProgress = snapshot.data ?? false;
-//                             return ElevatedButton.icon(
-//                               icon: const Icon(MdiIcons.play),
-//                               label: Text(hasProgress ? 'Continue' : 'Start'),
-//                               onPressed: () async {
-//                                 ///ads here
-//                                 // Navigator.push(context, MaterialPageRoute(builder: (context)=>MyHomePage()));
-//                                 final level = await getFirstUncompletedLevel();
-//                                 context
-//                                     .read<NavigatorCubit>()
-//                                     .navigateToLevel(level[0], level[1]);
-//                               },
-//                             );
-//                           },
-//                         ),
-//                         const SizedBox(height: 8),
-//                         OutlinedButton.icon(
-//                           icon: const Icon(MdiIcons.viewGridOutline),
-//                           label: const Text('Levels'),
-//                           onPressed: () {
-//                             context
-//                                 .read<NavigatorCubit>()
-//                                 .navigateToChapterSelection();
-//                           },
-//                         ),
-//                         const SizedBox(height: 8),
-//                         OutlinedButton.icon(
-//                           icon: const Icon(MdiIcons.vectorSquareEdit),
-//                           label: const Text('Editor'),
-//                           onPressed: () {
-//                             context.read<NavigatorCubit>().navigateToEditor();
-//                           },
-//                         ),
-//                         const SizedBox(height: 8),
-//                         OutlinedButton.icon(
-//                           icon: const Icon(Icons.settings),
-//                           label: const Text('Settings'),
-//                           onPressed: () {
-//                             context.read<NavigatorCubit>().navigateToSettings();
-//                           },
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }

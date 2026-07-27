@@ -79,7 +79,7 @@ int getManhattanDistance(Position position1, Position position2) {
   return (position1.x - position2.x).abs() + (position1.y - position2.y).abs();
 }
 
-class _PuzzleNode extends Comparable<_PuzzleNode> {
+class _PuzzleNode implements Comparable<_PuzzleNode> {
   _PuzzleNode(
     this.state,
     this.parent,

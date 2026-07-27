@@ -1,24 +1,14 @@
 import 'package:async/async.dart';
-// import 'package:blocked/ADs/ad%20helper.dart';
-import 'package:blocked/editor/editor.dart';
+import 'package:blocked/ADs/ad_manager.dart';
 import 'package:blocked/level/level.dart';
-import 'package:blocked/routing/routing.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../../ADs/ad_manager.dart';
-
+/// Glossy action row: Restart / Hint / Solve.
 class BoardControls extends StatefulWidget {
-  const BoardControls({Key? key})
-      : mapString = null,
-        super(key: key);
-  const BoardControls.generated(this.mapString, {Key? key}) : super(key: key);
-  final String? mapString;
-
-  bool get isGenerated => mapString != null;
+  const BoardControls({Key? key}) : super(key: key);
 
   @override
   State<BoardControls> createState() => _BoardControlsState();
@@ -27,24 +17,24 @@ class BoardControls extends StatefulWidget {
 class _BoardControlsState extends State<BoardControls> {
   CancelableOperation? solutionOperation;
   final adManager = AdManager();
+  final _hintCharges = ValueNotifier<int>(3);
 
   @override
   void initState() {
     super.initState();
-    adManager.addAds(true, true, true);
+    // Rewarded ads only when playing — don't re-bootstrap banner/interstitial.
+    adManager.prefetchRewardedAds();
   }
 
   @override
   void dispose() {
     solutionOperation?.cancel();
-    adManager.disposeAds();
+    _hintCharges.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted =
-        context.select((LevelBloc bloc) => bloc.state.isCompleted);
     return MultiBlocListener(
       listeners: [
         BlocListener<PuzzleSolverBloc, PuzzleSolverState>(
@@ -54,277 +44,97 @@ class _BoardControlsState extends State<BoardControls> {
           listener: (context, state) {
             if (state.isSolutionRequested && !state.hasSolutionResult) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Calculating solution...',
-                  ),
-                ),
+                const SnackBar(content: Text('Calculating solution...')),
               );
             }
             if (state.hasSolutionResult) {
               ScaffoldMessenger.of(context).clearSnackBars();
-              final moves = state.solution;
-
-              if (moves == null) {
+              if (state.solution == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No solution found')));
-                return;
-              }
-              if (!widget.isGenerated) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Solution viewed. Reload level to save progress.'),
-                    duration: Duration(seconds: 2),
-                  ),
+                  const SnackBar(content: Text('No solution found')),
                 );
               }
             }
           },
         ),
-        BlocListener<PuzzleSolverBloc, PuzzleSolverState>(
-          listenWhen: (previous, current) =>
-              !previous.isSolutionVisible && current.isSolutionVisible,
-          listener: (context, state) async {
-            final moves = state.solution;
-            if (moves == null) {
-              return;
-            }
-
-            await Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => SolutionPage(
-                initialState: context.read<LevelBloc>().initialState,
-                solution: moves,
-              ),
-            ));
-            context.read<PuzzleSolverBloc>().add(SolutionHidden());
-          },
-        ),
       ],
-      child: Builder(
-        builder: (context) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 520;
-                final baseButtons = [
-                  Expanded(
-                    child: _compactControlButton(
-                      icon: Icons.lightbulb_outline_rounded,
-                      label: 'Hint',
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.tertiaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.ondemand_video_rounded,
-                                size: 10,
-                                color:
-                                    Theme.of(context).colorScheme.onTertiaryContainer),
-                            // SizedBox(width: 3),
-                            // Text('Ad 15s',
-                            //     style: TextStyle(color: Colors.black)),
-                          ],
-                        ),
-                      ),
-                      onPressed: () async {
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final gap = constraints.maxWidth < 360 ? 6.0 : 10.0;
+          return Row(
+            children: [
+              Expanded(
+                child: _GlossyActionButton(
+                  label: 'RESTART',
+                  icon: Icons.refresh_rounded,
+                  colors: const [
+                    Color(0xFFFFB04A),
+                    Color(0xFFFF8A1A),
+                    Color(0xFFE06A00),
+                  ],
+                  onTap: () {
+                    context.read<LevelBloc>().add(const LevelReset());
+                  },
+                ),
+              ),
+              SizedBox(width: gap),
+              Expanded(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _hintCharges,
+                  builder: (context, charges, _) {
+                    return _GlossyActionButton(
+                      label: 'HINT',
+                      icon: Icons.lightbulb_rounded,
+                      colors: const [
+                        Color(0xFFC77DFF),
+                        Color(0xFF9B4DE8),
+                        Color(0xFF7A2FC4),
+                      ],
+                      badge: charges > 0 ? '$charges' : null,
+                      onTap: () async {
                         await _showRewardedAdWithLoader(
                           placement: RewardPlacement.hint,
                           onRewardEarned: () {
+                            if (!mounted) return;
+                            if (_hintCharges.value > 0) {
+                              _hintCharges.value--;
+                            }
                             context
                                 .read<PuzzleSolverBloc>()
                                 .add(SolutionViewed());
                           },
                         );
                       },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _compactControlButton(
-                      icon: Icons.play_arrow_rounded,
-                      label: 'Auto Solve',
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              Theme.of(context).colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.ondemand_video_rounded,
-                                size: 10,
-                                color:
-                                    Theme.of(context).colorScheme.onSecondaryContainer),
-                            // SizedBox(width: 3),
-                            // Text('Ad 60s',
-                            //     style: TextStyle(
-                            //         color: Colors.black, fontSize: 5)),
-                          ],
-                        ),
-                      ),
-                      onPressed: () async {
-                        await _showRewardedAdWithLoader(
-                          placement: RewardPlacement.autoSolve,
-                          onRewardEarned: () {
-                            context
-                                .read<PuzzleSolverBloc>()
-                                .add(SolutionPlayed());
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _compactControlButton(
-                      icon: Icons.refresh_rounded,
-                      label: 'Reset',
-                      onPressed: () {
-                        context.read<LevelBloc>().add(const LevelReset());
-                      },
-                    ),
-                  ),
-                ];
-
-                if (widget.isGenerated) {
-                  return Column(
-                    children: [
-                      Row(children: baseButtons),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AdaptiveTextButton(
-                              icon: const Icon(MdiIcons.contentCopy),
-                              label: const Text('YAML'),
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(
-                                    text: '- name: generated\n'
-                                        '  map: |-\n'
-                                        '${widget.mapString!.split('\n').map((line) => '    $line').join('\n')}',
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: AdaptiveTextButton(
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(
-                                    text:
-                                        'https://slide.jeffsieu.com/#/editor/generated/${encodeMapString(widget.mapString!)}',
-                                  ),
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Copied link to clipboard'),
-                                  ),
-                                );
-                              },
-                              icon: Icon(Icons.adaptive.share),
-                              label: const Text('Copy link'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                }
-
-                if (isNarrow) {
-                  return Column(
-                    children: [
-                      Row(children: baseButtons),
-                      if (isCompleted) ...[
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            label: const Text('Next'),
-                            icon: const Icon(Icons.arrow_forward),
-                            onPressed: () {
-                              context.read<LevelNavigation>().onNext();
-                            },
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    ...baseButtons,
-                    if (isCompleted) ...[
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        label: const Text('Next'),
-                        icon: const Icon(Icons.arrow_forward),
-                        onPressed: () {
-                          adManager.showInterstitial();
-                          context.read<LevelNavigation>().onNext();
-                        },
-                      ),
-                    ],
+                    );
+                  },
+                ),
+              ),
+              SizedBox(width: gap),
+              Expanded(
+                child: _GlossyActionButton(
+                  label: 'SOLVE',
+                  icon: Icons.auto_fix_high_rounded,
+                  colors: const [
+                    Color(0xFF8FE04A),
+                    Color(0xFF4CBB28),
+                    Color(0xFF2F9A1A),
                   ],
-                );
-              },
-            ),
+                  onTap: () async {
+                    await _showRewardedAdWithLoader(
+                      placement: RewardPlacement.autoSolve,
+                      onRewardEarned: () {
+                        if (!mounted) return;
+                        context
+                            .read<PuzzleSolverBloc>()
+                            .add(SolutionPlayed());
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
-      ),
-    );
-  }
-
-  Widget _compactControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    Widget? trailing,
-  }) {
-    return SizedBox(
-      height: 50,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-              ),
-            ),
-            if (trailing != null) ...[
-              const SizedBox(width: 6),
-              trailing,
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -333,38 +143,177 @@ class _BoardControlsState extends State<BoardControls> {
     required RewardPlacement placement,
     required VoidCallback onRewardEarned,
   }) async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Theme.of(context).colorScheme.scrim.withOpacity(0.54),
+      barrierColor: Colors.black54,
       builder: (dialogContext) => const _AdLoadingDialog(),
     );
 
+    var granted = false;
     try {
-      while (mounted) {
-        await adManager.waitUntilRewardedAdIsReady(placement);
-        if (!mounted) {
-          break;
-        }
+      final deadline = DateTime.now().add(const Duration(seconds: 22));
+      while (mounted && DateTime.now().isBefore(deadline)) {
+        await adManager.waitUntilRewardedAdIsReady(
+          placement,
+          timeout: const Duration(seconds: 8),
+        );
+        if (!mounted) break;
         final showResult = await adManager.showRewardedAdForPlacement(
           placement,
-          onRewardEarned: onRewardEarned,
+          onRewardEarned: () {
+            granted = true;
+            onRewardEarned();
+          },
         );
-        if (showResult == RewardShowResult.shown) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 450));
+        if (showResult == RewardShowResult.shown) break;
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ad not ready yet — try again in a moment.'),
+          ),
+        );
       }
     } finally {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
       }
       adManager.prefetchRewardedAds();
     }
+  }
+}
+
+class _GlossyActionButton extends StatelessWidget {
+  const _GlossyActionButton({
+    required this.label,
+    required this.icon,
+    required this.colors,
+    required this.onTap,
+    this.badge,
+  });
+
+  final String label;
+  final IconData icon;
+  final List<Color> colors;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 0.92,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: colors,
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    width: 2.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.last.withValues(alpha: 0.45),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 28),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        letterSpacing: 0.4,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black38,
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Top gloss
+              Positioned(
+                left: 8,
+                right: 8,
+                top: 5,
+                height: 14,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.35),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (badge != null)
+                Positioned(
+                  right: -2,
+                  top: -4,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE53935),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      badge!,
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -373,48 +322,46 @@ class _AdLoadingDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Dialog(
-      backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0),
+      backgroundColor: Colors.transparent,
       elevation: 0,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: const Color(0xFF4A2C14),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: scheme.outline),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.primary.withOpacity(0.18),
-              blurRadius: 18,
-              spreadRadius: 1,
-            ),
-          ],
+          border: Border.all(color: const Color(0xFFC4A574), width: 2),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 44,
-              height: 44,
+            const SizedBox(
+              width: 40,
+              height: 40,
               child: CircularProgressIndicator(
                 strokeWidth: 3.2,
-                color: scheme.primary,
+                color: Color(0xFFFFE566),
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'Loading Reward Ad...',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: GoogleFonts.nunito(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               'Please wait',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              style: GoogleFonts.nunito(
+                color: Colors.white70,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
