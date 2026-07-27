@@ -13,19 +13,17 @@ import 'package:blocked/theme/theme_presets.dart';
 import 'package:blocked/widgets/app_exit_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
-  // Silent background loads only — no haptic, no SFX playback here.
-  unawaited(GameMusic.instance.init());
-  unawaited(GameFeel.instance.init());
-  final levels = await readLevelsFromYaml();
-  final savedThemeColor = await getSavedColor();
+  // Load during native splash only — no second Flutter splash screen.
+  final results = await Future.wait<dynamic>([
+    readLevelsFromYaml(),
+    getSavedColor(),
+  ]);
   runApp(BlockedApp(
-    chapters: levels,
-    savedThemeColor: savedThemeColor,
+    chapters: results[0] as List<LevelChapter>,
+    savedThemeColor: results[1] as Color?,
   ));
 }
 
@@ -55,14 +53,21 @@ class _BlockedAppState extends State<BlockedApp> {
   @override
   void initState() {
     super.initState();
+    // Defer all heavy IO until after the first home frame paints.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AdManager().bootstrap(
-        interstitial: true,
-        banner: true,
-        rewarded: true,
-      );
-      // Music only — never warmUp/haptic on home.
-      GameMusic.instance.ensurePlaying();
+      unawaited(GameMusic.instance.init());
+      unawaited(GameFeel.instance.init());
+      unawaited(GameMusic.instance.ensurePlaying());
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        unawaited(
+          AdManager().bootstrap(
+            interstitial: true,
+            banner: true,
+            rewarded: true,
+          ),
+        );
+      });
     });
   }
 
@@ -111,6 +116,7 @@ class _BlockedAppState extends State<BlockedApp> {
                   builder: (context, child) {
                     return AppExitScope(
                       navigatorKey: navigatorKey,
+                      navigatorCubit: navigatorCubit,
                       child: child ?? const SizedBox.shrink(),
                     );
                   },

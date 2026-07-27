@@ -11,6 +11,9 @@ enum RewardShowResult { notReady, shown }
 ///
 /// Non-release builds use Google **test** unit IDs so ads always fill while
 /// developing. Release builds use your production unit IDs.
+///
+/// Loads are staggered and guarded so AdMob / GMS work never piles onto the
+/// UI isolate (ANR / jank). Call [bootstrap] only after the first Flutter frame.
 class AdManager {
   factory AdManager() => _instance;
   AdManager._();
@@ -53,7 +56,6 @@ class AdManager {
 
   static const _testBanner = 'ca-app-pub-3940256099942544/6300978111';
   static const _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
-  static const _testRewarded = 'ca-app-pub-3940256099942544/5224354917';
 
   final ValueNotifier<BannerAd?> bannerAdNotifier =
       ValueNotifier<BannerAd?>(null);
@@ -70,10 +72,15 @@ class AdManager {
   };
 
   int _bannerIndex = 0;
+  int _playBannerIndex = 0;
   int _interstitialIndex = 0;
   int _hintIndex = 0;
   int _skipIndex = 0;
 
+  int _bannerLoadGen = 0;
+  int _playBannerLoadGen = 0;
+
+  bool _sdkReady = false;
   bool _bootstrapping = false;
   bool _didBootstrap = false;
   bool _bannerLoading = false;
@@ -91,15 +98,40 @@ class AdManager {
     RewardPlacement.hint: 0,
     RewardPlacement.autoSolve: 0,
   };
+  /// Shared cooldown after no-fill / throttle — blocks all rewarded loads.
+  DateTime? _rewardCooldownUntil;
 
   List<String> get _bannerIds =>
       _useTestAds ? const [_testBanner] : _prodBanner;
   List<String> get _interstitialIds =>
       _useTestAds ? const [_testInterstitial] : _prodInterstitial;
-  List<String> get _hintIds =>
-      _useTestAds ? const [_testRewarded] : _prodHintRewarded;
-  List<String> get _skipIds =>
-      _useTestAds ? const [_testRewarded] : _prodSkipRewarded;
+  List<String> get _hintIds => _prodHintRewarded;
+  List<String> get _skipIds => _prodSkipRewarded;
+  // Rewarded uses production units — Google's test rewarded unit often returns
+  // "No fill" on real devices while banner/interstitial test ads still work.
+
+  Future<void> _ensureSdk() async {
+    if (_sdkReady) return;
+    try {
+      await MobileAds.instance
+          .initialize()
+          .timeout(const Duration(seconds: 8));
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          tagForChildDirectedTreatment:
+              TagForChildDirectedTreatment.unspecified,
+          testDeviceIds: const <String>[],
+        ),
+      );
+      _sdkReady = true;
+      print('[Ads] MobileAds SDK ready (testAds=$_useTestAds)');
+    } catch (e) {
+      print('[Ads] MobileAds init failed: $e');
+      // Allow retry on next bootstrap / ensureLoaded.
+      _sdkReady = false;
+      rethrow;
+    }
+  }
 
   /// Call after the first Flutter frame (Activity must be ready).
   Future<void> bootstrap({
@@ -112,30 +144,30 @@ class AdManager {
     try {
       print('[Ads] bootstrap… testAds=$_useTestAds release=$kReleaseMode');
 
-      await MobileAds.instance.updateRequestConfiguration(
-        RequestConfiguration(
-          tagForChildDirectedTreatment:
-              TagForChildDirectedTreatment.unspecified,
-          // Empty list is fine — test ad *unit* IDs already force test creatives.
-          testDeviceIds: const <String>[],
-        ),
-      );
+      await _ensureSdk();
 
-      // Let the Activity / platform view settle after first frame.
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+      // Brief settle — keep short so home stays responsive.
+      await Future<void>.delayed(const Duration(milliseconds: 250));
 
       _didBootstrap = true;
+
       if (banner) {
         _bannerLoading = false;
-        _playBannerLoading = false;
         loadBannerAd(force: true);
-        loadPlayBannerAd(force: true);
       }
+
       if (interstitial) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
         _interstitialLoading = false;
         loadInterstitialAd(force: true);
       }
-      if (rewarded) prefetchRewardedAds();
+
+      if (rewarded) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        prefetchRewardedAds();
+      }
+
+      // Play banner is loaded only from the level page — not at cold start.
     } catch (e, st) {
       print('[Ads] bootstrap error: $e\n$st');
       _didBootstrap = false;
@@ -160,7 +192,6 @@ class AdManager {
       return;
     }
     if (_bannerAd == null && !_bannerLoading) loadBannerAd();
-    if (_playBannerAd == null && !_playBannerLoading) loadPlayBannerAd();
     if (_interstitialAd == null && !_interstitialLoading) {
       loadInterstitialAd();
     }
@@ -172,6 +203,10 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void loadBannerAd({bool force = false}) {
+    if (!_sdkReady) {
+      unawaited(bootstrap(banner: true, interstitial: false, rewarded: false));
+      return;
+    }
     if (_bannerLoading && !force) return;
     if (_bannerAd != null && !force) return;
 
@@ -179,6 +214,15 @@ class AdManager {
     if (ids.isEmpty) return;
     if (_bannerIndex >= ids.length) _bannerIndex = 0;
 
+    // Detach AdWidget before disposing — prevents platform-view crashes.
+    if (force || _bannerAd != null) {
+      final old = _bannerAd;
+      _bannerAd = null;
+      bannerAdNotifier.value = null;
+      old?.dispose();
+    }
+
+    final gen = ++_bannerLoadGen;
     _bannerLoading = true;
     final unitId = ids[_bannerIndex].trim();
     print('[Ads] loading banner: $unitId');
@@ -189,6 +233,10 @@ class AdManager {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (Ad loaded) {
+          if (gen != _bannerLoadGen) {
+            loaded.dispose();
+            return;
+          }
           _bannerLoading = false;
           final banner = loaded as BannerAd;
           final old = _bannerAd;
@@ -198,6 +246,10 @@ class AdManager {
           print('[Ads] banner LOADED ✓ $unitId');
         },
         onAdFailedToLoad: (Ad failed, LoadAdError error) {
+          if (gen != _bannerLoadGen) {
+            failed.dispose();
+            return;
+          }
           print('[Ads] banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _bannerLoading = false;
@@ -209,25 +261,30 @@ class AdManager {
           _bannerIndex++;
           if (_bannerIndex < ids.length) {
             Future<void>.delayed(
-              const Duration(milliseconds: 800),
-              () => loadBannerAd(force: true),
+              const Duration(milliseconds: 900),
+              () {
+                if (gen == _bannerLoadGen) loadBannerAd(force: true);
+              },
             );
           } else {
             _bannerIndex = 0;
             Future<void>.delayed(
-              const Duration(seconds: 20),
-              () => loadBannerAd(force: true),
+              const Duration(seconds: 25),
+              () {
+                if (gen == _bannerLoadGen) loadBannerAd(force: true);
+              },
             );
           }
         },
       ),
     );
 
-    // Safety: if SDK never callbacks (broken plugin channel), unlock loader.
     Future<void>.delayed(const Duration(seconds: 30), () {
+      if (gen != _bannerLoadGen) return;
       if (_bannerLoading && _bannerAd == null) {
         print('[Ads] banner load timeout — retrying');
         _bannerLoading = false;
+        _bannerIndex = (_bannerIndex + 1) % ids.length;
         loadBannerAd(force: true);
       }
     });
@@ -237,15 +294,36 @@ class AdManager {
 
   /// Gameplay-only banner (separate instance from the shell banner).
   void loadPlayBannerAd({bool force = false}) {
+    if (!_sdkReady) {
+      unawaited(
+        bootstrap(banner: true, interstitial: false, rewarded: false).then((_) {
+          loadPlayBannerAd(force: force);
+        }),
+      );
+      return;
+    }
     if (_playBannerLoading && !force) return;
     if (_playBannerAd != null && !force) return;
 
     final ids = _bannerIds;
     if (ids.isEmpty) return;
-    // Prefer second unit if available so shell/play don't share one.
-    final unitId = ids[ids.length > 1 ? 1 % ids.length : 0].trim();
-    // With a single test id, still fine to request twice.
 
+    // Prefer a different unit from the shell banner when available.
+    if (ids.length > 1) {
+      _playBannerIndex = (_bannerIndex + 1) % ids.length;
+    } else {
+      _playBannerIndex = 0;
+    }
+    final unitId = ids[_playBannerIndex].trim();
+
+    if (force || _playBannerAd != null) {
+      final old = _playBannerAd;
+      _playBannerAd = null;
+      playBannerAdNotifier.value = null;
+      old?.dispose();
+    }
+
+    final gen = ++_playBannerLoadGen;
     _playBannerLoading = true;
     print('[Ads] loading play banner: $unitId');
 
@@ -255,6 +333,10 @@ class AdManager {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (Ad loaded) {
+          if (gen != _playBannerLoadGen) {
+            loaded.dispose();
+            return;
+          }
           _playBannerLoading = false;
           final banner = loaded as BannerAd;
           final old = _playBannerAd;
@@ -264,6 +346,10 @@ class AdManager {
           print('[Ads] play banner LOADED ✓ $unitId');
         },
         onAdFailedToLoad: (Ad failed, LoadAdError error) {
+          if (gen != _playBannerLoadGen) {
+            failed.dispose();
+            return;
+          }
           print('[Ads] play banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _playBannerLoading = false;
@@ -271,13 +357,46 @@ class AdManager {
           _playBannerAd = null;
           playBannerAdNotifier.value = null;
           Future<void>.delayed(
-            const Duration(seconds: 20),
-            () => loadPlayBannerAd(force: true),
+            const Duration(seconds: 25),
+            () {
+              if (gen == _playBannerLoadGen) loadPlayBannerAd(force: true);
+            },
           );
         },
       ),
     );
     ad.load();
+  }
+
+  /// Shell banner must leave the tree before play banner mounts (one AdWidget
+  /// per [BannerAd] instance).
+  void enterGameplayBanner() {
+    _detachShellBanner();
+    loadPlayBannerAd(force: true);
+  }
+
+  /// Restore shell banner after leaving a level.
+  void leaveGameplayBanner() {
+    _detachPlayBanner();
+    loadBannerAd(force: true);
+  }
+
+  void _detachShellBanner() {
+    _bannerLoadGen++;
+    _bannerLoading = false;
+    final old = _bannerAd;
+    _bannerAd = null;
+    bannerAdNotifier.value = null;
+    old?.dispose();
+  }
+
+  void _detachPlayBanner() {
+    _playBannerLoadGen++;
+    _playBannerLoading = false;
+    final old = _playBannerAd;
+    _playBannerAd = null;
+    playBannerAdNotifier.value = null;
+    old?.dispose();
   }
 
   BannerAd? getBannerAd() => _bannerAd;
@@ -287,10 +406,16 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void loadInterstitialAd({bool force = false}) {
+    if (!_sdkReady) return;
     if ((_interstitialLoading || _interstitialAd != null) && !force) return;
     final ids = _interstitialIds;
     if (ids.isEmpty) return;
     if (_interstitialIndex >= ids.length) _interstitialIndex = 0;
+
+    if (force) {
+      _interstitialAd?.dispose();
+      _interstitialAd = null;
+    }
 
     _interstitialLoading = true;
     final unitId = ids[_interstitialIndex].trim();
@@ -313,13 +438,13 @@ class AdManager {
           _interstitialIndex++;
           if (_interstitialIndex < ids.length) {
             Future<void>.delayed(
-              const Duration(milliseconds: 800),
+              const Duration(milliseconds: 900),
               () => loadInterstitialAd(force: true),
             );
           } else {
             _interstitialIndex = 0;
             Future<void>.delayed(
-              const Duration(seconds: 20),
+              const Duration(seconds: 25),
               () => loadInterstitialAd(force: true),
             );
           }
@@ -374,10 +499,15 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void prefetchRewardedAds() {
+    if (!_sdkReady) {
+      unawaited(
+        bootstrap(interstitial: false, banner: false, rewarded: true),
+      );
+      return;
+    }
     try {
-      // Serialize loads — concurrent requests for the same test unit hang/fail.
       _loadRewardedAd(RewardPlacement.hint);
-      Future<void>.delayed(const Duration(milliseconds: 600), () {
+      Future<void>.delayed(const Duration(seconds: 2), () {
         _loadRewardedAd(RewardPlacement.autoSolve);
       });
     } catch (e) {
@@ -385,16 +515,40 @@ class AdManager {
     }
   }
 
+  bool isRewardedReady(RewardPlacement placement) =>
+      _takePeekRewarded(placement) != null;
+
   bool get _rewardLoadInFlight =>
       _rewardLoading.values.any((v) => v == true);
 
-  void _loadRewardedAd(RewardPlacement placement) {
+  void _loadRewardedAd(RewardPlacement placement, {bool userInitiated = false}) {
+    if (!_sdkReady) {
+      unawaited(
+        bootstrap(interstitial: false, banner: false, rewarded: true).then((_) {
+          _loadRewardedAd(placement, userInitiated: userInitiated);
+        }),
+      );
+      return;
+    }
+
     if (_rewardedAds[placement] != null) return;
     if (_rewardLoading[placement] == true) return;
-    // One RewardedAd.load at a time (esp. test unit shared by both placements).
+
+    final now = DateTime.now();
+    if (!userInitiated &&
+        _rewardCooldownUntil != null &&
+        now.isBefore(_rewardCooldownUntil!)) {
+      final wait = _rewardCooldownUntil!.difference(now);
+      Future<void>.delayed(wait, () {
+        _loadRewardedAd(placement, userInitiated: userInitiated);
+      });
+      return;
+    }
+
+    // One RewardedAd.load at a time.
     if (_rewardLoadInFlight) {
-      Future<void>.delayed(const Duration(milliseconds: 700), () {
-        _loadRewardedAd(placement);
+      Future<void>.delayed(const Duration(milliseconds: 1200), () {
+        _loadRewardedAd(placement, userInitiated: userInitiated);
       });
       return;
     }
@@ -404,8 +558,10 @@ class AdManager {
     if (ids.isEmpty) return;
 
     final streak = _rewardFailStreak[placement] ?? 0;
-    if (streak >= ids.length * 2) {
+    if (!userInitiated && streak >= ids.length * 2) {
       _rewardFailStreak[placement] = 0;
+      _rewardCooldownUntil =
+          DateTime.now().add(const Duration(seconds: 30));
       Future<void>.delayed(
         const Duration(seconds: 30),
         () => _loadRewardedAd(placement),
@@ -428,7 +584,8 @@ class AdManager {
           _rewardedAds[placement] = ad;
           _rewardLoading[placement] = false;
           _rewardFailStreak[placement] = 0;
-          _completeRewardReady(placement);
+          _rewardCooldownUntil = null;
+          _signalRewardReady(placement);
           print('[Ads] rewarded LOADED ✓ ($placement)');
         },
         onAdFailedToLoad: (LoadAdError error) {
@@ -441,10 +598,15 @@ class AdManager {
           } else {
             _skipIndex = next;
           }
-          // Unblock waiters so UI can retry / dismiss loader.
-          _completeRewardReady(placement);
+
+          final noFillOrThrottled = error.code == 3 || error.code == 1;
+          final delaySec = noFillOrThrottled
+              ? (userInitiated ? 5 : 15) + (streak * 5).clamp(0, 30)
+              : 3 + streak;
+          _rewardCooldownUntil =
+              DateTime.now().add(Duration(seconds: delaySec));
           Future<void>.delayed(
-            Duration(milliseconds: 800 + (streak * 250).clamp(0, 3000)),
+            Duration(seconds: delaySec),
             () => _loadRewardedAd(placement),
           );
         },
@@ -452,13 +614,24 @@ class AdManager {
     );
   }
 
+  void _signalRewardReady(RewardPlacement placement) {
+    final c = _rewardReady[placement];
+    if (c != null && !c.isCompleted) c.complete();
+    // In test mode one load backs both buttons.
+    if (_useTestAds) {
+      for (final p in RewardPlacement.values) {
+        if (p == placement) continue;
+        final other = _rewardReady[p];
+        if (other != null && !other.isCompleted) other.complete();
+      }
+    }
+  }
+
   void _completeRewardReady(RewardPlacement placement) {
     final c = _rewardReady[placement];
     if (c != null && !c.isCompleted) c.complete();
     _rewardReady[placement] = null;
   }
-
-  /// In test mode both placements share one unit — borrow a ready ad.
   RewardedAd? _takeReadyRewarded(RewardPlacement placement) {
     final own = _rewardedAds[placement];
     if (own != null) {
@@ -480,19 +653,37 @@ class AdManager {
 
   Future<void> waitUntilRewardedAdIsReady(
     RewardPlacement placement, {
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 30),
   }) async {
-    if (_takePeekRewarded(placement) != null) return;
+    if (isRewardedReady(placement)) return;
 
-    _rewardReady[placement] ??= Completer<void>();
-    _loadRewardedAd(placement);
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (isRewardedReady(placement)) return;
 
-    try {
-      await _rewardReady[placement]!.future.timeout(timeout);
-    } on TimeoutException {
-      print('[Ads] rewarded wait timeout ($placement)');
-      _completeRewardReady(placement);
+      _rewardReady[placement] ??= Completer<void>();
+      _loadRewardedAd(placement, userInitiated: true);
+
+      final remaining = deadline.difference(DateTime.now());
+      if (remaining <= Duration.zero) break;
+
+      try {
+        await _rewardReady[placement]!.future.timeout(
+          remaining < const Duration(seconds: 4)
+              ? remaining
+              : const Duration(seconds: 4),
+        );
+      } on TimeoutException {
+        // Load still in flight or failed — loop and retry.
+      }
+      _rewardReady[placement] = null;
+
+      if (isRewardedReady(placement)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 800));
     }
+
+    print('[Ads] rewarded wait timeout ($placement)');
+    _rewardReady[placement] = null;
   }
 
   RewardedAd? _takePeekRewarded(RewardPlacement placement) {
@@ -511,7 +702,7 @@ class AdManager {
   }) async {
     final ad = _takeReadyRewarded(placement);
     if (ad == null) {
-      _loadRewardedAd(placement);
+      _loadRewardedAd(placement, userInitiated: true);
       return RewardShowResult.notReady;
     }
 
@@ -545,19 +736,16 @@ class AdManager {
           didEarn = true;
         },
       );
-      // Wait until the native fullscreen is closed (or failed), with a cap.
       await done.future.timeout(
         const Duration(minutes: 3),
         onTimeout: () {},
       );
-      return didEarn || true
-          ? RewardShowResult.shown
-          : RewardShowResult.shown;
+      return RewardShowResult.shown;
     } catch (e) {
       print('[Ads] rewarded show error: $e');
       ad.dispose();
       if (!done.isCompleted) done.complete();
-      _loadRewardedAd(placement);
+      _loadRewardedAd(placement, userInitiated: true);
       return RewardShowResult.notReady;
     }
   }
@@ -574,6 +762,8 @@ class AdManager {
   void disposeAds() {}
 
   void disposeAll() {
+    _bannerLoadGen++;
+    _playBannerLoadGen++;
     _bannerAd?.dispose();
     _bannerAd = null;
     bannerAdNotifier.value = null;

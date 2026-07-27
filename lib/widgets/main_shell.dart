@@ -60,6 +60,8 @@ class MainShell extends StatelessWidget {
       },
       builder: (context, path) {
         final index = context.read<NavigatorCubit>().effectiveShellTab(path);
+        final inLevel =
+            path is LevelRoutePath && path.levelName != null;
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -90,8 +92,8 @@ class MainShell extends StatelessWidget {
                     );
                   },
                 ),
-                // Zero height when unloaded — no empty gap in the UI.
-                const BannerAdBar(),
+                // Hide while a level is open — play screen has its own banner.
+                if (!inLevel) const BannerAdBar(),
               ],
             ),
           ],

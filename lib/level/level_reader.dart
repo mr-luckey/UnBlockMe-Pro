@@ -1,5 +1,6 @@
-import 'package:blocked/level/level.dart';
+import 'package:blocked/level/bloc/level_bloc.dart';
 import 'package:blocked/models/models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:yaml/yaml.dart';
 
@@ -48,27 +49,33 @@ extension on int {
 }
 
 Future<List<LevelChapter>> readLevelsFromYaml() async {
-  final chapters = <LevelChapter>[];
   final data = await rootBundle.loadString('assets/levels.yaml');
+  // Parse + build chapters off the UI isolate (500+ levels).
+  return compute(_parseLevelsYamlIsolate, data);
+}
+
+/// Top-level for [compute] — keep free of Flutter UI bindings.
+List<LevelChapter> _parseLevelsYamlIsolate(String data) {
   final yamlData = loadYaml(data);
+  final chapters = <LevelChapter>[];
 
-  for (YamlMap chapterData in yamlData) {
-    final name = chapterData['name'].toString();
-    final description = chapterData['description'].toString();
-    final levelsData = chapterData['levels'];
-
+  for (final chapterData in yamlData as Iterable) {
+    final map = chapterData as YamlMap;
     final levels = <LevelData>[];
-    for (YamlMap levelData in levelsData) {
-      final name = levelData['name']!.toString();
-      final String? hint = levelData['hint'];
-      final map = levelData['map']!.toString();
+    for (final levelData in map['levels'] as Iterable) {
+      final level = levelData as YamlMap;
+      final hint = level['hint'];
       levels.add(LevelData(
-        name: name.toString(),
+        name: level['name']!.toString(),
         hint: hint?.toString(),
-        map: map,
+        map: level['map']!.toString(),
       ));
     }
-    chapters.add(LevelChapter(name, description, levels));
+    chapters.add(LevelChapter(
+      map['name'].toString(),
+      map['description'].toString(),
+      levels,
+    ));
   }
   return chapters;
 }

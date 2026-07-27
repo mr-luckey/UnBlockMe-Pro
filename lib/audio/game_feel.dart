@@ -24,10 +24,10 @@ class GameFeel {
   final AudioPlayer _tap = _sfxPlayer();
   final AudioPlayer _win = _sfxPlayer();
 
-  static const _hitVol = 0.55;
-  static const _slideVol = 0.22;
-  static const _tapVol = 0.28;
-  static const _winVol = 0.45;
+  static const _hitVol = 1.0;
+  static const _slideVol = 0.44;
+  static const _tapVol = 0.56;
+  static const _winVol = 0.90;
 
   bool _assetsReady = false;
   bool _engineUnlocked = false;

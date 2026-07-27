@@ -13,7 +13,6 @@ import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 
 class LevelPage extends StatelessWidget {
@@ -84,7 +83,14 @@ class _LevelPageViewState extends State<_LevelPageView> {
     super.initState();
     // Silent SFX preload only — no haptic / no auto sounds on level open.
     unawaited(GameFeel.instance.init());
-    AdManager().loadPlayBannerAd();
+    AdManager().enterGameplayBanner();
+    AdManager().prefetchRewardedAds();
+  }
+
+  @override
+  void dispose() {
+    AdManager().leaveGameplayBanner();
+    super.dispose();
   }
 
   void _showPauseMenu(BuildContext context) {
@@ -354,36 +360,9 @@ class _LevelPageViewState extends State<_LevelPageView> {
                               ),
                             ),
                             SizedBox(height: 8 * s),
-                            // Stats + play banner: when ad is absent, height is 0
-                            // so the board keeps full space (fully responsive).
-                            ValueListenableBuilder<BannerAd?>(
-                              valueListenable:
-                                  AdManager().playBannerAdNotifier,
-                              builder: (context, playBanner, _) {
-                                final hasBanner = playBanner != null;
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    BlocBuilder<LevelHudCubit, LevelHudState>(
-                                      buildWhen: (a, b) =>
-                                          a.bestMoves != b.bestMoves,
-                                      builder: (context, hud) {
-                                        return _PlayStatsBar(
-                                          scale: s,
-                                          bottomPad:
-                                              hasBanner ? 0 : pad.bottom,
-                                          moves: state.moves,
-                                          bestMoves: hud.bestMoves,
-                                        );
-                                      },
-                                    ),
-                                    const BannerAdBar(
-                                      slot: BannerAdSlot.play,
-                                      includeBottomSafeArea: true,
-                                    ),
-                                  ],
-                                );
-                              },
+                            const BannerAdBar(
+                              slot: BannerAdSlot.play,
+                              includeBottomSafeArea: true,
                             ),
                           ],
                         ),
@@ -754,147 +733,6 @@ class _WoodStatPlank extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-
-class _PlayStatsBar extends StatelessWidget {
-  const _PlayStatsBar({
-    required this.scale,
-    required this.bottomPad,
-    required this.moves,
-    required this.bestMoves,
-  });
-
-  final double scale;
-  final double bottomPad;
-  final int moves;
-  final int? bestMoves;
-
-  @override
-  Widget build(BuildContext context) {
-    final safe = bottomPad > 0 ? bottomPad : 8.0;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-      padding: EdgeInsets.fromLTRB(8, 10, 8, safe + 6),
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        image: const DecorationImage(
-          image: AssetImage('assets/ui/home/nav_wood.png'),
-          fit: BoxFit.cover,
-        ),
-        border: Border.all(color: const Color(0xFFC4A574), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-        child: ColoredBox(
-          color: const Color(0xFF3A2210).withValues(alpha: 0.55),
-          child: StreamBuilder<PlayerProgress>(
-            stream: playerProgressStream(),
-            builder: (context, snap) {
-              final totalStars = snap.data?.totalStars ?? 0;
-              return Row(
-                children: [
-                  Expanded(
-                    child: _FooterStat(
-                      iconAsset: 'assets/ui/home/icon_star.png',
-                      value: '$totalStars',
-                      label: 'STARS',
-                      scale: scale,
-                    ),
-                  ),
-                  Container(
-                    width: 1.5,
-                    height: 48 * scale,
-                    color: const Color(0xFF2A1808),
-                  ),
-                  Expanded(
-                    child: _FooterStat(
-                      iconAsset: 'assets/ui/home/icon_trophy.png',
-                      value: '${bestMoves ?? '—'}',
-                      label: 'BEST MOVES',
-                      scale: scale,
-                    ),
-                  ),
-                  Container(
-                    width: 1.5,
-                    height: 48 * scale,
-                    color: const Color(0xFF2A1808),
-                  ),
-                  Expanded(
-                    child: _FooterStat(
-                      icon: Icons.gps_fixed_rounded,
-                      iconColor: const Color(0xFFFF6B5A),
-                      value: '$moves',
-                      label: 'MOVES',
-                      scale: scale,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FooterStat extends StatelessWidget {
-  const _FooterStat({
-    required this.value,
-    required this.label,
-    required this.scale,
-    this.iconAsset,
-    this.icon,
-    this.iconColor,
-  });
-
-  final String value;
-  final String label;
-  final double scale;
-  final String? iconAsset;
-  final IconData? icon;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (iconAsset != null)
-          Image.asset(iconAsset!, height: 22 * scale, fit: BoxFit.contain)
-        else
-          Icon(icon, color: iconColor ?? Colors.white, size: 22 * scale),
-        SizedBox(height: 2 * scale),
-        Text(
-          value,
-          style: GoogleFonts.nunito(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: (20 * scale).clamp(16.0, 24.0),
-            height: 1.05,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.nunito(
-            color: Colors.white70,
-            fontWeight: FontWeight.w800,
-            fontSize: (10 * scale).clamp(9.0, 12.0),
-            letterSpacing: 0.4,
-          ),
-        ),
-      ],
     );
   }
 }

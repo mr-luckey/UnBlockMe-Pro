@@ -10,7 +10,6 @@ class GameMusic with WidgetsBindingObserver {
 
   static const _asset = 'assets/audio/bgm_forest.wav';
   static const _prefsKey = 'music.muted';
-  /// Master volume for BGM (1.0 = full player gain).
   static const _softVolume = 1.0;
 
   final AudioPlayer _player = AudioPlayer();

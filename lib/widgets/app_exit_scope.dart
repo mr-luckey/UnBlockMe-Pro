@@ -1,25 +1,35 @@
+import 'package:blocked/routing/routing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// App-wide Android/system back handling with wood-themed exit confirm.
 ///
-/// - If the navigator can pop (level, dialog, etc.) → pop that route.
-/// - If already at the root shell → show themed "Exit game?" dialog.
+/// - Navigator stack (level, dialog) → pop.
+/// - Shell tabs (Levels / Settings) → [NavigatorCubit.navigateToPreviousPage].
+/// - Home root only → themed exit dialog.
 class AppExitScope extends StatelessWidget {
   const AppExitScope({
     Key? key,
     required this.navigatorKey,
+    required this.navigatorCubit,
     required this.child,
   }) : super(key: key);
 
   final GlobalKey<NavigatorState> navigatorKey;
+  final NavigatorCubit navigatorCubit;
   final Widget child;
 
   Future<void> _onBack() async {
     final nav = navigatorKey.currentState;
     if (nav != null && nav.canPop()) {
       nav.pop();
+      return;
+    }
+
+    final route = navigatorCubit.state;
+    if (!route.isHome) {
+      navigatorCubit.navigateToPreviousPage();
       return;
     }
 

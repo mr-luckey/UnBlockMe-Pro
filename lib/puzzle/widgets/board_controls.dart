@@ -152,26 +152,19 @@ class _BoardControlsState extends State<BoardControls> {
       builder: (dialogContext) => const _AdLoadingDialog(),
     );
 
-    var granted = false;
     try {
-      final deadline = DateTime.now().add(const Duration(seconds: 22));
-      while (mounted && DateTime.now().isBefore(deadline)) {
-        await adManager.waitUntilRewardedAdIsReady(
+      await adManager.waitUntilRewardedAdIsReady(
+        placement,
+        timeout: const Duration(seconds: 35),
+      );
+      if (!mounted) return;
+
+      if (adManager.isRewardedReady(placement)) {
+        await adManager.showRewardedAdForPlacement(
           placement,
-          timeout: const Duration(seconds: 8),
+          onRewardEarned: onRewardEarned,
         );
-        if (!mounted) break;
-        final showResult = await adManager.showRewardedAdForPlacement(
-          placement,
-          onRewardEarned: () {
-            granted = true;
-            onRewardEarned();
-          },
-        );
-        if (showResult == RewardShowResult.shown) break;
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-      }
-      if (!granted && mounted) {
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Ad not ready yet — try again in a moment.'),

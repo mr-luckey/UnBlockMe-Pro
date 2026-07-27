@@ -40,9 +40,9 @@ class _HomeViewState extends State<_HomeView> {
   @override
   void initState() {
     super.initState();
-    adManager.ensureLoaded();
-    // Silent SFX unlock while Home is idle — first button tap stays instant.
+    // Ads bootstrap is deferred from main — don't pile on first home frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      adManager.ensureLoaded();
       unawaited(GameFeel.instance.prewarm());
     });
   }
@@ -70,9 +70,9 @@ class _HomeViewState extends State<_HomeView> {
     final s = (h / 840).clamp(0.82, 1.15);
     final side = (w * 0.055).clamp(18.0, 28.0);
 
-    final logoH = (h * 0.13).clamp(96.0, 128.0);
     final playH = (h * 0.125).clamp(92.0, 118.0);
     final gap = (6.0 * s).clamp(4.0, 9.0);
+    final titleH = (h * 0.19).clamp(108.0, 148.0);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -104,28 +104,41 @@ class _HomeViewState extends State<_HomeView> {
                     padding: EdgeInsets.fromLTRB(side, 4, side, gap),
                     child: Column(
                       children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: GameMusic.instance.muted,
-                            builder: (context, muted, _) {
-                              return _MuteChip(
-                                muted: muted,
-                                onTap: () {
-                                  GameFeel.instance.tap();
-                                  GameMusic.instance.toggleMute();
-                                },
-                              );
-                            },
+                        SizedBox(
+                          height: titleH + gap * 0.4,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Positioned(
+                                top: gap * 0.2,
+                                left: 0,
+                                right: 0,
+                                child: Image.asset(
+                                  '$_assets/title_banner.png',
+                                  height: titleH,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                  gaplessPlayback: true,
+                                ),
+                              ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: GameMusic.instance.muted,
+                                  builder: (context, muted, _) {
+                                    return _MuteChip(
+                                      muted: muted,
+                                      onTap: () {
+                                        GameFeel.instance.tap();
+                                        GameMusic.instance.toggleMute();
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(height: gap * 0.4),
-                        Image.asset(
-                          '$_assets/logo.png',
-                          height: logoH,
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
-                          gaplessPlayback: true,
                         ),
                         SizedBox(height: gap),
                         Expanded(
