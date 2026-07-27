@@ -53,7 +53,7 @@ class MainShell extends StatelessWidget {
         final wasPlaying = prev is LevelRoutePath && prev.levelName != null;
         final isPlaying = next is LevelRoutePath && next.levelName != null;
         if (wasPlaying != isPlaying) {
-          return wasPlaying;
+          return true;
         }
         if (isPlaying) return false;
         return nav.effectiveShellTab(prev) != nav.effectiveShellTab(next);

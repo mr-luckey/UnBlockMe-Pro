@@ -9,8 +9,7 @@ enum RewardShowResult { notReady, shown }
 
 /// Central AdMob manager — banner, interstitial, rewarded (hint / skip).
 ///
-/// Non-release builds use Google **test** unit IDs so ads always fill while
-/// developing. Release builds use your production unit IDs.
+/// Uses production AdMob unit IDs in all builds.
 ///
 /// Loads are staggered and guarded so AdMob / GMS work never piles onto the
 /// UI isolate (ANR / jank). Call [bootstrap] only after the first Flutter frame.
@@ -18,11 +17,6 @@ class AdManager {
   factory AdManager() => _instance;
   AdManager._();
   static final AdManager _instance = AdManager._();
-
-  /// Set `true` only when you want real production ads in a debug run.
-  static const bool forceProductionAds = false;
-
-  static bool get _useTestAds => !kReleaseMode && !forceProductionAds;
 
   // --- Production unit IDs ---
   static const _prodBanner = [
@@ -58,9 +52,6 @@ class AdManager {
     'ca-app-pub-5561438827097019/2121025205',
     'ca-app-pub-5561438827097019/2862337799',
   ];
-
-  static const _testBanner = 'ca-app-pub-3940256099942544/6300978111';
-  static const _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
 
   final ValueNotifier<BannerAd?> bannerAdNotifier =
       ValueNotifier<BannerAd?>(null);
@@ -108,14 +99,10 @@ class AdManager {
   /// Shared cooldown after no-fill / throttle — blocks all rewarded loads.
   DateTime? _rewardCooldownUntil;
 
-  List<String> get _bannerIds =>
-      _useTestAds ? const [_testBanner] : _prodBanner;
-  List<String> get _interstitialIds =>
-      _useTestAds ? const [_testInterstitial] : _prodInterstitial;
+  List<String> get _bannerIds => _prodBanner;
+  List<String> get _interstitialIds => _prodInterstitial;
   List<String> get _hintIds => _prodHintRewarded;
   List<String> get _skipIds => _prodSkipRewarded;
-  // Rewarded uses production units — Google's test rewarded unit often returns
-  // "No fill" on real devices while banner/interstitial test ads still work.
 
   Future<void> _ensureSdk() async {
     if (_sdkReady) return;
@@ -129,7 +116,7 @@ class AdManager {
         ),
       );
       _sdkReady = true;
-      print('[Ads] MobileAds SDK ready (testAds=$_useTestAds)');
+      print('[Ads] MobileAds SDK ready (production units)');
     } catch (e) {
       print('[Ads] MobileAds init failed: $e');
       // Allow retry on next bootstrap / ensureLoaded.
@@ -147,7 +134,7 @@ class AdManager {
     if (_bootstrapping) return;
     _bootstrapping = true;
     try {
-      print('[Ads] bootstrap… testAds=$_useTestAds release=$kReleaseMode');
+      print('[Ads] bootstrap… production units release=$kReleaseMode');
 
       await _ensureSdk();
 
@@ -600,14 +587,6 @@ class AdManager {
   void _signalRewardReady(RewardPlacement placement) {
     final c = _rewardReady[placement];
     if (c != null && !c.isCompleted) c.complete();
-    // In test mode one load backs both buttons.
-    if (_useTestAds) {
-      for (final p in RewardPlacement.values) {
-        if (p == placement) continue;
-        final other = _rewardReady[p];
-        if (other != null && !other.isCompleted) other.complete();
-      }
-    }
   }
 
   void _completeRewardReady(RewardPlacement placement) {
@@ -621,16 +600,6 @@ class AdManager {
     if (own != null) {
       _rewardedAds[placement] = null;
       return own;
-    }
-    if (_useTestAds) {
-      for (final other in RewardPlacement.values) {
-        if (other == placement) continue;
-        final borrowed = _rewardedAds[other];
-        if (borrowed != null) {
-          _rewardedAds[other] = null;
-          return borrowed;
-        }
-      }
     }
     return null;
   }
@@ -671,13 +640,7 @@ class AdManager {
   }
 
   RewardedAd? _takePeekRewarded(RewardPlacement placement) {
-    if (_rewardedAds[placement] != null) return _rewardedAds[placement];
-    if (_useTestAds) {
-      for (final other in RewardPlacement.values) {
-        if (_rewardedAds[other] != null) return _rewardedAds[other];
-      }
-    }
-    return null;
+    return _rewardedAds[placement];
   }
 
   Future<RewardShowResult> showRewardedAdForPlacement(
