@@ -22,17 +22,22 @@ class AdManager {
   /// Set `true` only when you want real production ads in a debug run.
   static const bool forceProductionAds = false;
 
-  static bool get _useTestAds =>
-      !kReleaseMode && !forceProductionAds;
+  static bool get _useTestAds => !kReleaseMode && !forceProductionAds;
 
   // --- Production unit IDs ---
   static const _prodBanner = [
-    'ca-app-pub-5561438827097019/5440263702',
-    'ca-app-pub-5561438827097019/9075891424',
+    'ca-app-pub-5561438827097019/9629852666',
+    'ca-app-pub-5561438827097019/8316770999',
+    'ca-app-pub-5561438827097019/1207482870',
+    'ca-app-pub-5561438827097019/1280589357',
+    'ca-app-pub-5561438827097019/2896923355',
   ];
   static const _prodInterstitial = [
-    'ca-app-pub-5561438827097019/5136646412',
-    'ca-app-pub-5561438827097019/1767777858',
+    'ca-app-pub-5561438827097019/2053926619',
+    'ca-app-pub-5561438827097019/9740844949',
+    'ca-app-pub-5561438827097019/9438280976',
+    'ca-app-pub-5561438827097019/7114681608',
+    'ca-app-pub-5561438827097019/7537921658',
   ];
   static const _prodHintRewarded = [
     'ca-app-pub-5561438827097019/6764030149',
@@ -59,6 +64,7 @@ class AdManager {
 
   final ValueNotifier<BannerAd?> bannerAdNotifier =
       ValueNotifier<BannerAd?>(null);
+
   /// Separate banner for gameplay (AdWidget can only host one BannerAd each).
   final ValueNotifier<BannerAd?> playBannerAdNotifier =
       ValueNotifier<BannerAd?>(null);
@@ -98,6 +104,7 @@ class AdManager {
     RewardPlacement.hint: 0,
     RewardPlacement.autoSolve: 0,
   };
+
   /// Shared cooldown after no-fill / throttle — blocks all rewarded loads.
   DateTime? _rewardCooldownUntil;
 
@@ -113,9 +120,7 @@ class AdManager {
   Future<void> _ensureSdk() async {
     if (_sdkReady) return;
     try {
-      await MobileAds.instance
-          .initialize()
-          .timeout(const Duration(seconds: 8));
+      await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(
           tagForChildDirectedTreatment:
@@ -154,6 +159,12 @@ class AdManager {
       if (banner) {
         _bannerLoading = false;
         loadBannerAd(force: true);
+        // Preload gameplay banner so level screen never shows an empty strip.
+        Future<void>.delayed(const Duration(milliseconds: 900), () {
+          if (_playBannerAd == null && !_playBannerLoading) {
+            loadPlayBannerAd();
+          }
+        });
       }
 
       if (interstitial) {
@@ -214,14 +225,7 @@ class AdManager {
     if (ids.isEmpty) return;
     if (_bannerIndex >= ids.length) _bannerIndex = 0;
 
-    // Detach AdWidget before disposing — prevents platform-view crashes.
-    if (force || _bannerAd != null) {
-      final old = _bannerAd;
-      _bannerAd = null;
-      bannerAdNotifier.value = null;
-      old?.dispose();
-    }
-
+    // Keep the current banner visible until a replacement loads — avoids gaps.
     final gen = ++_bannerLoadGen;
     _bannerLoading = true;
     final unitId = ids[_bannerIndex].trim();
@@ -253,11 +257,6 @@ class AdManager {
           print('[Ads] banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _bannerLoading = false;
-          if (_bannerAd != null) {
-            _bannerAd?.dispose();
-            _bannerAd = null;
-            bannerAdNotifier.value = null;
-          }
           _bannerIndex++;
           if (_bannerIndex < ids.length) {
             Future<void>.delayed(
@@ -316,13 +315,6 @@ class AdManager {
     }
     final unitId = ids[_playBannerIndex].trim();
 
-    if (force || _playBannerAd != null) {
-      final old = _playBannerAd;
-      _playBannerAd = null;
-      playBannerAdNotifier.value = null;
-      old?.dispose();
-    }
-
     final gen = ++_playBannerLoadGen;
     _playBannerLoading = true;
     print('[Ads] loading play banner: $unitId');
@@ -353,9 +345,6 @@ class AdManager {
           print('[Ads] play banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _playBannerLoading = false;
-          _playBannerAd?.dispose();
-          _playBannerAd = null;
-          playBannerAdNotifier.value = null;
           Future<void>.delayed(
             const Duration(seconds: 25),
             () {
@@ -368,26 +357,22 @@ class AdManager {
     ad.load();
   }
 
-  /// Shell banner must leave the tree before play banner mounts (one AdWidget
-  /// per [BannerAd] instance).
+  /// Shell banner stays loaded — [MainShell] hides it while a level is open.
+  /// Only ensure the gameplay banner is ready (no dispose / reload flicker).
   void enterGameplayBanner() {
-    _detachShellBanner();
-    loadPlayBannerAd(force: true);
+    if (_playBannerAd == null && !_playBannerLoading) {
+      loadPlayBannerAd();
+    }
   }
 
-  /// Restore shell banner after leaving a level.
+  /// Drop gameplay banner and restore the shell strip (already loaded).
   void leaveGameplayBanner() {
     _detachPlayBanner();
-    loadBannerAd(force: true);
-  }
-
-  void _detachShellBanner() {
-    _bannerLoadGen++;
-    _bannerLoading = false;
-    final old = _bannerAd;
-    _bannerAd = null;
-    bannerAdNotifier.value = null;
-    old?.dispose();
+    if (_bannerAd != null) {
+      bannerAdNotifier.value = _bannerAd;
+    } else if (!_bannerLoading) {
+      loadBannerAd();
+    }
   }
 
   void _detachPlayBanner() {
@@ -518,10 +503,10 @@ class AdManager {
   bool isRewardedReady(RewardPlacement placement) =>
       _takePeekRewarded(placement) != null;
 
-  bool get _rewardLoadInFlight =>
-      _rewardLoading.values.any((v) => v == true);
+  bool get _rewardLoadInFlight => _rewardLoading.values.any((v) => v == true);
 
-  void _loadRewardedAd(RewardPlacement placement, {bool userInitiated = false}) {
+  void _loadRewardedAd(RewardPlacement placement,
+      {bool userInitiated = false}) {
     if (!_sdkReady) {
       unawaited(
         bootstrap(interstitial: false, banner: false, rewarded: true).then((_) {
@@ -553,15 +538,13 @@ class AdManager {
       return;
     }
 
-    final ids =
-        placement == RewardPlacement.hint ? _hintIds : _skipIds;
+    final ids = placement == RewardPlacement.hint ? _hintIds : _skipIds;
     if (ids.isEmpty) return;
 
     final streak = _rewardFailStreak[placement] ?? 0;
     if (!userInitiated && streak >= ids.length * 2) {
       _rewardFailStreak[placement] = 0;
-      _rewardCooldownUntil =
-          DateTime.now().add(const Duration(seconds: 30));
+      _rewardCooldownUntil = DateTime.now().add(const Duration(seconds: 30));
       Future<void>.delayed(
         const Duration(seconds: 30),
         () => _loadRewardedAd(placement),
@@ -632,6 +615,7 @@ class AdManager {
     if (c != null && !c.isCompleted) c.complete();
     _rewardReady[placement] = null;
   }
+
   RewardedAd? _takeReadyRewarded(RewardPlacement placement) {
     final own = _rewardedAds[placement];
     if (own != null) {
@@ -669,10 +653,10 @@ class AdManager {
 
       try {
         await _rewardReady[placement]!.future.timeout(
-          remaining < const Duration(seconds: 4)
-              ? remaining
-              : const Duration(seconds: 4),
-        );
+              remaining < const Duration(seconds: 4)
+                  ? remaining
+                  : const Duration(seconds: 4),
+            );
       } on TimeoutException {
         // Load still in flight or failed — loop and retry.
       }

@@ -66,8 +66,19 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
         }
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
 
@@ -79,7 +90,7 @@ flutter {
 }
 
 dependencies {
-    implementation "com.google.android.gms:play-services-ads:22.2.0"
+    implementation "com.google.android.gms:play-services-ads:25.1.0"
     implementation 'com.facebook.infer.annotation:infer-annotation:0.18.0'
     implementation "androidx.multidex:multidex:2.0.1"
 }

@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _levelPrefix = 'progress.level.';
 /// Set to false before release to restore level/chapter locks.
-const bool unlockAllLevelsForTesting = true;
+const bool unlockAllLevelsForTesting = false;
 
 const _starsPrefix = 'progress.stars.';
 const _bestSecondsPrefix = 'progress.bestSeconds.';
