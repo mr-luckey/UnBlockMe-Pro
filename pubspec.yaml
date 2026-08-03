@@ -3,7 +3,7 @@ description: A creative spin on the classic sliding puzzle game.
 
 publish_to: "none"
 
-version: 8.0.2
+version: 9.0.2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -55,3 +55,4 @@ flutter:
     - assets/ui/map/
     - assets/ui/play/
     - assets/ui/complete/
+    - google_fonts/

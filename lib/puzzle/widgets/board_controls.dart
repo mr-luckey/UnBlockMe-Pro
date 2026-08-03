@@ -1,5 +1,6 @@
 import 'package:async/async.dart';
 import 'package:blocked/ADs/ad_manager.dart';
+import 'package:blocked/ADs/network_status.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
@@ -145,12 +146,31 @@ class _BoardControlsState extends State<BoardControls> {
   }) async {
     if (!mounted) return;
 
+    final feature =
+        placement == RewardPlacement.hint ? 'Hint' : 'Solve';
+
+    // Block immediately when offline — don't spin on an ad that can't load.
+    if (!await hasInternetConnection()) {
+      if (!mounted) return;
+      await _showNoInternetDialog(feature);
+      return;
+    }
+    if (!mounted) return;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black54,
       builder: (dialogContext) => const _AdLoadingDialog(),
     );
+
+    var loaderOpen = true;
+    void closeLoader() {
+      if (!loaderOpen || !mounted) return;
+      final nav = Navigator.of(context, rootNavigator: true);
+      if (nav.canPop()) nav.pop();
+      loaderOpen = false;
+    }
 
     try {
       await adManager.waitUntilRewardedAdIsReady(
@@ -160,24 +180,109 @@ class _BoardControlsState extends State<BoardControls> {
       if (!mounted) return;
 
       if (adManager.isRewardedReady(placement)) {
+        closeLoader();
         await adManager.showRewardedAdForPlacement(
           placement,
           onRewardEarned: onRewardEarned,
         );
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ad not ready yet — try again in a moment.'),
-          ),
-        );
+        // Timed out — re-check in case the user lost connection mid-wait.
+        final online = await hasInternetConnection();
+        if (!mounted) return;
+        closeLoader();
+        if (!online) {
+          await _showNoInternetDialog(feature);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '$feature needs a reward ad. Try again in a moment.',
+              ),
+            ),
+          );
+        }
       }
     } finally {
-      if (mounted) {
-        final nav = Navigator.of(context, rootNavigator: true);
-        if (nav.canPop()) nav.pop();
-      }
+      closeLoader();
       adManager.prefetchRewardedAds();
     }
+  }
+
+  Future<void> _showNoInternetDialog(String feature) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF6B4226), Color(0xFF3A2210)],
+              ),
+              border: Border.all(color: const Color(0xFFC4A574), width: 3),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  color: Color(0xFFFFD54F),
+                  size: 42,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'NO INTERNET',
+                  style: GoogleFonts.nunito(
+                    color: const Color(0xFFFFF1D6),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '$feature needs a reward ad.\n'
+                  'Turn on internet, then try again.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFFC4A574),
+                      foregroundColor: const Color(0xFF3A2210),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'OK',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

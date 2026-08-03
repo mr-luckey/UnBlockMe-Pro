@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:blocked/ADs/network_status.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -13,6 +14,9 @@ enum RewardShowResult { notReady, shown }
 ///
 /// Loads are staggered and guarded so AdMob / GMS work never piles onto the
 /// UI isolate (ANR / jank). Call [bootstrap] only after the first Flutter frame.
+///
+/// Offline: never call [MobileAds.initialize] and never retry-storm loads —
+/// that is the main ANR / crash cause when the user turns off internet.
 class AdManager {
   factory AdManager() => _instance;
   AdManager._();
@@ -99,15 +103,83 @@ class AdManager {
   /// Shared cooldown after no-fill / throttle — blocks all rewarded loads.
   DateTime? _rewardCooldownUntil;
 
+  /// When set, all AdMob loads/init are paused (offline / network errors).
+  DateTime? _offlineUntil;
+  bool _offlineRetryScheduled = false;
+
   List<String> get _bannerIds => _prodBanner;
   List<String> get _interstitialIds => _prodInterstitial;
   List<String> get _hintIds => _prodHintRewarded;
   List<String> get _skipIds => _prodSkipRewarded;
 
+  bool get _isOfflinePaused =>
+      _offlineUntil != null && DateTime.now().isBefore(_offlineUntil!);
+
+  bool _isNetworkAdError(LoadAdError error) {
+    // 0 = INTERNAL_ERROR (very common offline), 2 = NETWORK_ERROR
+    if (error.code == 0 || error.code == 2) return true;
+    final msg = error.message.toLowerCase();
+    return msg.contains('network') ||
+        msg.contains('internal error') ||
+        msg.contains('unable to resolve') ||
+        msg.contains('unknown host');
+  }
+
+  void _enterOfflineMode({Duration forDuration = const Duration(seconds: 60)}) {
+    markNetworkOffline();
+    _offlineUntil = DateTime.now().add(forDuration);
+    _bannerLoading = false;
+    _playBannerLoading = false;
+    _interstitialLoading = false;
+    for (final p in RewardPlacement.values) {
+      _rewardLoading[p] = false;
+    }
+    // Invalidate in-flight load generations so delayed retries no-op.
+    _bannerLoadGen++;
+    _playBannerLoadGen++;
+    print('[Ads] offline pause ${forDuration.inSeconds}s — no AdMob traffic');
+    _scheduleOfflineWake();
+  }
+
+  void _scheduleOfflineWake() {
+    if (_offlineRetryScheduled) return;
+    _offlineRetryScheduled = true;
+    final wait = _offlineUntil?.difference(DateTime.now()) ??
+        const Duration(seconds: 60);
+    Future<void>.delayed(wait + const Duration(seconds: 1), () async {
+      _offlineRetryScheduled = false;
+      final online = await hasInternetConnection(force: true);
+      if (!online) {
+        _enterOfflineMode(forDuration: const Duration(seconds: 90));
+        return;
+      }
+      markNetworkOnline();
+      _offlineUntil = null;
+      if (!_didBootstrap) {
+        unawaited(bootstrap());
+      } else {
+        ensureLoaded();
+      }
+    });
+  }
+
+  Future<bool> _guardOnline({bool forceCheck = false}) async {
+    if (_isOfflinePaused && !forceCheck) return false;
+    final online = await hasInternetConnection(force: forceCheck);
+    if (!online) {
+      _enterOfflineMode();
+      return false;
+    }
+    markNetworkOnline();
+    _offlineUntil = null;
+    return true;
+  }
+
   Future<void> _ensureSdk() async {
     if (_sdkReady) return;
     try {
-      await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
+      // Short timeout — offline / broken GMS must not hang the UI.
+      await MobileAds.instance.initialize().timeout(const Duration(seconds: 5));
       await MobileAds.instance.updateRequestConfiguration(
         RequestConfiguration(
           tagForChildDirectedTreatment:
@@ -119,8 +191,8 @@ class AdManager {
       print('[Ads] MobileAds SDK ready (production units)');
     } catch (e) {
       print('[Ads] MobileAds init failed: $e');
-      // Allow retry on next bootstrap / ensureLoaded.
       _sdkReady = false;
+      _enterOfflineMode(forDuration: const Duration(seconds: 90));
       rethrow;
     }
   }
@@ -132,13 +204,23 @@ class AdManager {
     bool rewarded = true,
   }) async {
     if (_bootstrapping) return;
+    if (_isOfflinePaused) {
+      print('[Ads] bootstrap skipped — offline pause active');
+      _scheduleOfflineWake();
+      return;
+    }
     _bootstrapping = true;
     try {
       print('[Ads] bootstrap… production units release=$kReleaseMode');
 
+      // Core ANR fix: never touch MobileAds while offline.
+      if (!await _guardOnline(forceCheck: true)) {
+        print('[Ads] bootstrap skipped — no internet');
+        return;
+      }
+
       await _ensureSdk();
 
-      // Brief settle — keep short so home stays responsive.
       await Future<void>.delayed(const Duration(milliseconds: 250));
 
       _didBootstrap = true;
@@ -146,7 +228,6 @@ class AdManager {
       if (banner) {
         _bannerLoading = false;
         loadBannerAd(force: true);
-        // Preload gameplay banner so level screen never shows an empty strip.
         Future<void>.delayed(const Duration(milliseconds: 900), () {
           if (_playBannerAd == null && !_playBannerLoading) {
             loadPlayBannerAd();
@@ -164,8 +245,6 @@ class AdManager {
         await Future<void>.delayed(const Duration(milliseconds: 400));
         prefetchRewardedAds();
       }
-
-      // Play banner is loaded only from the level page — not at cold start.
     } catch (e, st) {
       print('[Ads] bootstrap error: $e\n$st');
       _didBootstrap = false;
@@ -185,6 +264,10 @@ class AdManager {
   }
 
   void ensureLoaded() {
+    if (_isOfflinePaused) {
+      _scheduleOfflineWake();
+      return;
+    }
     if (!_didBootstrap) {
       unawaited(bootstrap());
       return;
@@ -201,6 +284,7 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void loadBannerAd({bool force = false}) {
+    if (_isOfflinePaused) return;
     if (!_sdkReady) {
       unawaited(bootstrap(banner: true, interstitial: false, rewarded: false));
       return;
@@ -244,20 +328,28 @@ class AdManager {
           print('[Ads] banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _bannerLoading = false;
+          if (_isNetworkAdError(error)) {
+            _enterOfflineMode();
+            return;
+          }
           _bannerIndex++;
           if (_bannerIndex < ids.length) {
             Future<void>.delayed(
               const Duration(milliseconds: 900),
               () {
-                if (gen == _bannerLoadGen) loadBannerAd(force: true);
+                if (gen == _bannerLoadGen && !_isOfflinePaused) {
+                  loadBannerAd(force: true);
+                }
               },
             );
           } else {
             _bannerIndex = 0;
             Future<void>.delayed(
-              const Duration(seconds: 25),
+              const Duration(seconds: 45),
               () {
-                if (gen == _bannerLoadGen) loadBannerAd(force: true);
+                if (gen == _bannerLoadGen && !_isOfflinePaused) {
+                  loadBannerAd(force: true);
+                }
               },
             );
           }
@@ -265,13 +357,12 @@ class AdManager {
       ),
     );
 
-    Future<void>.delayed(const Duration(seconds: 30), () {
+    Future<void>.delayed(const Duration(seconds: 20), () {
       if (gen != _bannerLoadGen) return;
       if (_bannerLoading && _bannerAd == null) {
-        print('[Ads] banner load timeout — retrying');
+        print('[Ads] banner load timeout — pausing');
         _bannerLoading = false;
-        _bannerIndex = (_bannerIndex + 1) % ids.length;
-        loadBannerAd(force: true);
+        _enterOfflineMode(forDuration: const Duration(seconds: 45));
       }
     });
 
@@ -280,10 +371,11 @@ class AdManager {
 
   /// Gameplay-only banner (separate instance from the shell banner).
   void loadPlayBannerAd({bool force = false}) {
+    if (_isOfflinePaused) return;
     if (!_sdkReady) {
       unawaited(
         bootstrap(banner: true, interstitial: false, rewarded: false).then((_) {
-          loadPlayBannerAd(force: force);
+          if (!_isOfflinePaused) loadPlayBannerAd(force: force);
         }),
       );
       return;
@@ -332,10 +424,16 @@ class AdManager {
           print('[Ads] play banner FAILED ✗ $unitId → $error');
           failed.dispose();
           _playBannerLoading = false;
+          if (_isNetworkAdError(error)) {
+            _enterOfflineMode();
+            return;
+          }
           Future<void>.delayed(
-            const Duration(seconds: 25),
+            const Duration(seconds: 45),
             () {
-              if (gen == _playBannerLoadGen) loadPlayBannerAd(force: true);
+              if (gen == _playBannerLoadGen && !_isOfflinePaused) {
+                loadPlayBannerAd(force: true);
+              }
             },
           );
         },
@@ -378,6 +476,7 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void loadInterstitialAd({bool force = false}) {
+    if (_isOfflinePaused) return;
     if (!_sdkReady) return;
     if ((_interstitialLoading || _interstitialAd != null) && !force) return;
     final ids = _interstitialIds;
@@ -407,17 +506,25 @@ class AdManager {
           print('[Ads] interstitial FAILED ✗ $unitId → $error');
           _interstitialLoading = false;
           _interstitialAd = null;
+          if (_isNetworkAdError(error)) {
+            _enterOfflineMode();
+            return;
+          }
           _interstitialIndex++;
           if (_interstitialIndex < ids.length) {
             Future<void>.delayed(
               const Duration(milliseconds: 900),
-              () => loadInterstitialAd(force: true),
+              () {
+                if (!_isOfflinePaused) loadInterstitialAd(force: true);
+              },
             );
           } else {
             _interstitialIndex = 0;
             Future<void>.delayed(
-              const Duration(seconds: 25),
-              () => loadInterstitialAd(force: true),
+              const Duration(seconds: 45),
+              () {
+                if (!_isOfflinePaused) loadInterstitialAd(force: true);
+              },
             );
           }
         },
@@ -428,6 +535,7 @@ class AdManager {
   bool get isInterstitialReady => _interstitialAd != null;
 
   Future<bool> showInterstitial() async {
+    if (_isOfflinePaused) return false;
     final ad = _interstitialAd;
     if (ad == null) {
       loadInterstitialAd(force: true);
@@ -471,6 +579,7 @@ class AdManager {
   // ---------------------------------------------------------------------------
 
   void prefetchRewardedAds() {
+    if (_isOfflinePaused) return;
     if (!_sdkReady) {
       unawaited(
         bootstrap(interstitial: false, banner: false, rewarded: true),
@@ -480,7 +589,7 @@ class AdManager {
     try {
       _loadRewardedAd(RewardPlacement.hint);
       Future<void>.delayed(const Duration(seconds: 2), () {
-        _loadRewardedAd(RewardPlacement.autoSolve);
+        if (!_isOfflinePaused) _loadRewardedAd(RewardPlacement.autoSolve);
       });
     } catch (e) {
       print('[Ads] prefetch rewarded error: $e');
@@ -494,10 +603,13 @@ class AdManager {
 
   void _loadRewardedAd(RewardPlacement placement,
       {bool userInitiated = false}) {
+    if (_isOfflinePaused) return;
     if (!_sdkReady) {
       unawaited(
         bootstrap(interstitial: false, banner: false, rewarded: true).then((_) {
-          _loadRewardedAd(placement, userInitiated: userInitiated);
+          if (!_isOfflinePaused) {
+            _loadRewardedAd(placement, userInitiated: userInitiated);
+          }
         }),
       );
       return;
@@ -512,7 +624,9 @@ class AdManager {
         now.isBefore(_rewardCooldownUntil!)) {
       final wait = _rewardCooldownUntil!.difference(now);
       Future<void>.delayed(wait, () {
-        _loadRewardedAd(placement, userInitiated: userInitiated);
+        if (!_isOfflinePaused) {
+          _loadRewardedAd(placement, userInitiated: userInitiated);
+        }
       });
       return;
     }
@@ -520,7 +634,9 @@ class AdManager {
     // One RewardedAd.load at a time.
     if (_rewardLoadInFlight) {
       Future<void>.delayed(const Duration(milliseconds: 1200), () {
-        _loadRewardedAd(placement, userInitiated: userInitiated);
+        if (!_isOfflinePaused) {
+          _loadRewardedAd(placement, userInitiated: userInitiated);
+        }
       });
       return;
     }
@@ -531,11 +647,7 @@ class AdManager {
     final streak = _rewardFailStreak[placement] ?? 0;
     if (!userInitiated && streak >= ids.length * 2) {
       _rewardFailStreak[placement] = 0;
-      _rewardCooldownUntil = DateTime.now().add(const Duration(seconds: 30));
-      Future<void>.delayed(
-        const Duration(seconds: 30),
-        () => _loadRewardedAd(placement),
-      );
+      _enterOfflineMode(forDuration: const Duration(seconds: 60));
       return;
     }
 
@@ -569,6 +681,12 @@ class AdManager {
             _skipIndex = next;
           }
 
+          if (_isNetworkAdError(error)) {
+            _enterOfflineMode();
+            _completeRewardReady(placement);
+            return;
+          }
+
           final noFillOrThrottled = error.code == 3 || error.code == 1;
           final delaySec = noFillOrThrottled
               ? (userInitiated ? 5 : 15) + (streak * 5).clamp(0, 30)
@@ -577,7 +695,9 @@ class AdManager {
               DateTime.now().add(Duration(seconds: delaySec));
           Future<void>.delayed(
             Duration(seconds: delaySec),
-            () => _loadRewardedAd(placement),
+            () {
+              if (!_isOfflinePaused) _loadRewardedAd(placement);
+            },
           );
         },
       ),
@@ -609,9 +729,12 @@ class AdManager {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     if (isRewardedReady(placement)) return;
+    if (_isOfflinePaused) return;
+    if (!await _guardOnline()) return;
 
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
+      if (_isOfflinePaused) return;
       if (isRewardedReady(placement)) return;
 
       _rewardReady[placement] ??= Completer<void>();

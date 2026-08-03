@@ -11,11 +11,24 @@ import 'package:blocked/settings/settings.dart';
 import 'package:blocked/theme/theme.dart';
 import 'package:blocked/theme/theme_presets.dart';
 import 'package:blocked/widgets/app_exit_scope.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Use bundled fonts only — never download at runtime (offline crash fix).
+  GoogleFonts.config.allowRuntimeFetching = false;
+  // Soft-fail if a font weight is somehow missing; don't kill the isolate.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    final msg = error.toString();
+    if (msg.contains('google_fonts') || msg.contains('Failed to load font')) {
+      debugPrint('Suppressed font error: $error');
+      return true;
+    }
+    return false;
+  };
   // Load during native splash only — no second Flutter splash screen.
   final results = await Future.wait<dynamic>([
     readLevelsFromYaml(),
