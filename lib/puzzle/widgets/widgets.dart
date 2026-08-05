@@ -8,3 +8,4 @@ export 'puzzle_block.dart';
 export 'puzzle_floor.dart';
 export 'static_puzzle.dart';
 export 'wall.dart';
+export 'wood_block.dart';

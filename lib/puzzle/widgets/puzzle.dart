@@ -65,9 +65,9 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                 clipBehavior: Clip.none,
                 alignment: Alignment.topLeft,
                 children: [
-                  for (var block in board.blocks)
+                  for (final (index, block) in board.blocks.indexed)
                     AnimatedPositioned(
-                      key: ValueKey(board.blocks.indexOf(block)),
+                      key: ValueKey(index),
                       duration: kSlideDuration,
                       curve: Curves.easeInOutCubic,
                       left: block.left.toBlockOffset(),
@@ -91,7 +91,7 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                                                   false
                                               ? block.height
                                               : block.width)))),
-                          child: PuzzleBlock(block),
+                          child: PuzzleBlock(block, grainSeed: index),
                         ),
                       ),
                     ),

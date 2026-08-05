@@ -7,14 +7,20 @@ import 'package:flutter/material.dart';
 
 /// How far the rim reaches outside the board rect. The board layout itself is
 /// untouched; the rim simply claims a little room around it.
-const kBoardFrameOverhang = 16.0;
+const kBoardFrameOverhang = 15.0;
 
-/// Total thickness of the rim: the overhang plus the margin the board already
-/// leaves between its outer edge and the first cell.
-const kBoardFrameThickness = kBoardFrameOverhang + kWallWidth + kBlockGap;
+/// How far the rim reaches into the board rect. The first cell starts at
+/// [kWallWidth] + [kBlockGap], so staying well short of that leaves the blocks
+/// breathing room instead of pressing them against the wood.
+const kBoardFrameInnerReach = 3.0;
 
-const _outerRadius = 32.0;
-const _innerRadius = 12.0;
+/// Total thickness of the rim.
+const kBoardFrameThickness = kBoardFrameOverhang + kBoardFrameInnerReach;
+
+/// Keeping the two radii a rim apart makes the ring the same width all the way
+/// round, corners included.
+const _outerRadius = 26.0;
+const _innerRadius = _outerRadius - kBoardFrameThickness;
 
 /// Dark walnut, lit from the top left.
 const _woodLit = Color(0xFF7A5230);
@@ -25,6 +31,11 @@ const _woodHighlight = Color(0xFFEFD3A6);
 const _woodBlack = Color(0xFF0E0803);
 
 const _exitGold = Color(0xFFFFCE5C);
+
+/// The exit is floored with warm wood rather than left open, so the gold
+/// markings always have something to read against.
+const _exitBedMid = Color(0xFF63401F);
+const _exitBedDeep = Color(0xFF3A2410);
 
 /// An exit segment spans a whole wall run, but only a block's width actually
 /// passes through it. Narrowing the carve by this much on each side makes the
@@ -258,10 +269,10 @@ class _BoardFramePainter extends CustomPainter {
       ..save()
       ..clipPath(outside)
       ..drawRRect(
-        outer.shift(const Offset(0, 6)),
+        outer.shift(const Offset(0, 4)),
         Paint()
           ..color = Colors.black.withValues(alpha: 0.5)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
       )
       ..restore();
   }
@@ -300,10 +311,10 @@ class _BoardFramePainter extends CustomPainter {
     // Rounded-over outer edge: catches the light on the top left, falls away
     // into shadow on the bottom right.
     canvas.drawRRect(
-      outer.deflate(1.7),
+      outer.deflate(1.3),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.4
+        ..strokeWidth = 2.6
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -325,10 +336,10 @@ class _BoardFramePainter extends CustomPainter {
 
     // Inner edge is lit the opposite way, which reads as a sunken tray.
     canvas.drawRRect(
-      inner.inflate(2.7),
+      inner.inflate(1.9),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 5.4
+        ..strokeWidth = 3.8
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -408,17 +419,17 @@ class _BoardFramePainter extends CustomPainter {
 
     // Fixed seed so the grain never shimmers between frames.
     final random = math.Random(horizontal ? 17 : 43);
-    for (var i = 0; i < 6; i++) {
-      final depth = base + sign * _t * (0.10 + i * 0.15);
+    for (var i = 0; i < 5; i++) {
+      final depth = base + sign * _t * (0.13 + i * 0.18);
       final lit = i.isOdd;
       final paint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = lit ? 1.5 : 1.1
+        ..strokeWidth = lit ? 1.2 : 0.9
         ..color = lit
             ? _woodHighlight.withValues(alpha: 0.10)
             : _woodBlack.withValues(alpha: 0.22);
 
-      final wobble = 1.1 + random.nextDouble() * 1.7;
+      final wobble = 0.6 + random.nextDouble() * 1.0;
       final phase = random.nextDouble() * math.pi * 2;
       final path = Path();
       const steps = 16;
@@ -475,8 +486,9 @@ class _BoardFramePainter extends CustomPainter {
       ..save()
       ..clipRect(rect);
 
-    // The tray floor runs a little way into the carve and then gives out to
-    // open air, so the exit reads as a way out rather than a dark hole.
+    // The carve is floored with warm wood rather than left open, so the gold
+    // markings stay legible. It falls back into shadow at the mouth, which is
+    // what keeps the channel reading as cut into the rim rather than stuck on.
     canvas.drawRect(
       rect,
       Paint()
@@ -484,12 +496,11 @@ class _BoardFramePainter extends CustomPainter {
           begin: opening.flowStart,
           end: opening.flowEnd,
           colors: [
-            Color.lerp(tray, Colors.black, 0.15)!,
-            Color.lerp(tray, Colors.black, 0.45)!,
-            Color.lerp(tray, Colors.black, 0.5)!.withValues(alpha: 0),
-            Colors.transparent,
+            Color.lerp(tray, _exitBedDeep, 0.55)!,
+            _exitBedMid,
+            Color.lerp(_exitBedMid, _exitBedDeep, 0.6)!,
           ],
-          stops: const [0, 0.34, 0.64, 1],
+          stops: const [0, 0.5, 1],
         ).createShader(rect),
     );
 
@@ -573,7 +584,9 @@ class _BoardFramePainter extends CustomPainter {
       );
     }
 
-    // Warm halo hanging in the mouth of the carve.
+    // The rim overhangs its own carve, so the mouth sits in shadow. Without
+    // this the channel reads as a tab stuck onto the frame rather than a hole
+    // cut through it.
     canvas.drawRect(
       rect,
       Paint()
@@ -582,9 +595,9 @@ class _BoardFramePainter extends CustomPainter {
           end: opening.flowEnd,
           colors: [
             Colors.transparent,
-            _exitGold.withValues(alpha: 0.14),
+            _woodBlack.withValues(alpha: 0.45),
           ],
-          stops: const [0.35, 1],
+          stops: const [0.45, 1],
         ).createShader(rect),
     );
   }
@@ -592,7 +605,7 @@ class _BoardFramePainter extends CustomPainter {
   void _paintExitArrows(Canvas canvas, Rect rect, _Opening opening) {
     final depth = opening.isHorizontalFlow ? rect.width : rect.height;
     final breadth = opening.isHorizontalFlow ? rect.height : rect.width;
-    final reach = math.min(depth * 0.28, breadth * 0.26);
+    final reach = math.min(depth * 0.36, breadth * 0.26);
     if (reach < 3) return;
 
     final direction = opening.outward;
@@ -618,8 +631,8 @@ class _BoardFramePainter extends CustomPainter {
             ..strokeWidth = reach * 0.85
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
-            ..color = _exitGold.withValues(alpha: opacity * 0.4)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, reach * 0.5),
+            ..color = _exitGold.withValues(alpha: opacity * 0.28)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, reach * 0.45),
         )
         ..drawPath(
           chevron,

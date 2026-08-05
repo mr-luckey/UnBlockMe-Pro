@@ -82,15 +82,13 @@ class BoardPainter extends CustomPainter {
       );
     }
 
-    for (final block in board.blocks) {
+    for (final (index, block) in board.blocks.indexed) {
       final controlled = block == controlledBlock;
       final fill =
           controlled ? boardColors.controlledBlock : boardColors.block;
       final outline = controlled
           ? boardColors.controlledBlockOutline
           : boardColors.blockOutline;
-      final highlight = Color.lerp(fill, Colors.white, 0.35)!;
-      final shade = Color.lerp(fill, Colors.black, 0.4)!;
 
       final blockRect = Rect.fromLTWH(
         block.position.x.toBlockOffset(),
@@ -98,28 +96,19 @@ class BoardPainter extends CustomPainter {
         block.width.toBlockSize(),
         block.height.toBlockSize(),
       );
-      final rrect =
-          RRect.fromRectAndRadius(blockRect, const Radius.circular(10));
 
       canvas.drawRRect(
-        rrect.shift(const Offset(0, 2)),
-        Paint()..color = Colors.black.withValues(alpha: 0.3),
+        RRect.fromRectAndRadius(blockRect, const Radius.circular(10))
+            .shift(const Offset(1, 3)),
+        Paint()..color = Colors.black.withValues(alpha: 0.32),
       );
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [highlight, fill, shade],
-          ).createShader(blockRect),
-      );
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = outline
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5,
+      paintWoodBlock(
+        canvas,
+        blockRect,
+        fill: fill,
+        outline: outline,
+        seed: index,
+        controlled: controlled,
       );
 
       if (block.isMain) {

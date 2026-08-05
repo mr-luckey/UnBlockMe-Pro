@@ -290,7 +290,12 @@ class _LevelPageViewState extends State<_LevelPageView> {
                                     aspectRatio: 1,
                                     child: FittedBox(
                                       child: Hero(
-                                        tag: 'puzzle',
+                                        // Tagged per level so the board only
+                                        // flies to and from its own map tile.
+                                        // Level to level shares no tag, which
+                                        // keeps the board inside the page and
+                                        // sliding along with the background.
+                                        tag: widget.level.name,
                                         flightShuttleBuilder: (
                                           flightContext,
                                           animation,
@@ -326,7 +331,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
                                     width: size.width - side * 2,
                                     height: 88,
                                     child: Hero(
-                                      tag: 'puzzle_controls',
+                                      tag: 'controls_${widget.level.name}',
                                       flightShuttleBuilder: (
                                         flightContext,
                                         animation,

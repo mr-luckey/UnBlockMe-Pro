@@ -11,11 +11,17 @@ class PuzzleBlock extends StatelessWidget {
   const PuzzleBlock(
     this.block, {
     Key? key,
+    this.grainSeed = 0,
     this.curve = const Interval(0.5, 1),
     this.duration = _defaultDuration,
   }) : super(key: key);
 
   final Block block;
+
+  /// Fixes this piece's grain pattern. Anything stable for the lifetime of the
+  /// block works; the board passes its index so the grain does not crawl while
+  /// the piece slides around.
+  final int grainSeed;
   final Curve curve;
   final Duration duration;
 
@@ -27,9 +33,6 @@ class PuzzleBlock extends StatelessWidget {
     final outline = controlled
         ? boardColors.controlledBlockOutline
         : boardColors.blockOutline;
-    final highlight = Color.lerp(fill, Colors.white, 0.38)!;
-    final shade = Color.lerp(fill, Colors.black, 0.42)!;
-    final mid = Color.lerp(fill, shade, 0.2)!;
     final gem = controlled
         ? boardColors.controlledBlockOutline
         : const Color(0xFFFFC857);
@@ -53,126 +56,51 @@ class PuzzleBlock extends StatelessWidget {
               borderRadius: radius,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: controlled ? 10 : 7,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: controlled ? 11 : 8,
+                  offset: const Offset(2, 5),
+                  spreadRadius: -1,
                 ),
                 if (controlled)
                   BoxShadow(
-                    color: outline.withValues(alpha: 0.45),
-                    blurRadius: 12,
+                    color: outline.withValues(alpha: 0.4),
+                    blurRadius: 14,
                     spreadRadius: 0.5,
                   ),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: radius,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Body — carved wood / stone slab
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          highlight,
-                          fill,
-                          mid,
-                          shade,
-                        ],
-                        stops: const [0, 0.28, 0.72, 1],
-                      ),
-                      border: Border.all(
-                        color: Color.lerp(outline, shade, 0.25)!,
-                        width: 2.5,
-                      ),
-                      borderRadius: radius,
-                    ),
-                  ),
-                  // Top bevel shine
-                  Positioned(
-                    left: 4,
-                    right: 4,
-                    top: 3,
-                    height: max(8.0, min(block.width, block.height) * 8.0),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.38),
-                            Colors.white.withValues(alpha: 0.0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Side rim light
-                  Positioned(
-                    left: 3,
-                    top: 10,
-                    bottom: 8,
-                    width: 3,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(2),
-                        color: Colors.white.withValues(alpha: 0.14),
-                      ),
-                    ),
-                  ),
-                  // Bottom edge depth
-                  Positioned(
-                    left: 6,
-                    right: 6,
-                    bottom: 3,
-                    height: 3,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(2),
-                        color: Colors.black.withValues(alpha: 0.28),
-                      ),
-                    ),
-                  ),
-                  // Grain lines (subtle)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _BlockGrainPainter(
-                        color: shade.withValues(alpha: 0.18),
-                        horizontal: block.width >= block.height,
-                      ),
-                    ),
-                  ),
-                  // Main exit gem
-                  Center(
-                    child: AnimatedOpacity(
-                      opacity: block.isMain ? 1 : 0,
+            child: CustomPaint(
+              painter: _WoodBlockPainter(
+                fill: fill,
+                outline: outline,
+                controlled: controlled,
+                seed: grainSeed,
+                radius: radius.topLeft.x,
+              ),
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: block.isMain ? 1 : 0,
+                  duration: _mainCircleAnimationDuration,
+                  child: AnimatedSwitcher(
+                    duration: duration,
+                    switchInCurve: curve,
+                    switchOutCurve: curve.flipped,
+                    child: AnimatedContainer(
+                      key: ValueKey(block.hasControl),
                       duration: _mainCircleAnimationDuration,
-                      child: AnimatedSwitcher(
-                        duration: duration,
-                        switchInCurve: curve,
-                        switchOutCurve: curve.flipped,
-                        child: AnimatedContainer(
-                          key: ValueKey(block.hasControl),
-                          duration: _mainCircleAnimationDuration,
-                          curve: Curves.easeOutQuad,
-                          width: (block.isMain ? 1 : 0) *
-                              min(block.width, block.height) *
-                              kBlockSize /
-                              2.15,
-                          height: (block.isMain ? 1 : 0) *
-                              min(block.width, block.height) *
-                              kBlockSize /
-                              2.15,
-                          child: _MainGem(color: gem, glow: outline),
-                        ),
-                      ),
+                      curve: Curves.easeOutQuad,
+                      width: (block.isMain ? 1 : 0) *
+                          min(block.width, block.height) *
+                          kBlockSize /
+                          2.15,
+                      height: (block.isMain ? 1 : 0) *
+                          min(block.width, block.height) *
+                          kBlockSize /
+                          2.15,
+                      child: _MainGem(color: gem, glow: outline),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -180,6 +108,43 @@ class PuzzleBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+class _WoodBlockPainter extends CustomPainter {
+  const _WoodBlockPainter({
+    required this.fill,
+    required this.outline,
+    required this.controlled,
+    required this.seed,
+    required this.radius,
+  });
+
+  final Color fill;
+  final Color outline;
+  final bool controlled;
+  final int seed;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    paintWoodBlock(
+      canvas,
+      Offset.zero & size,
+      fill: fill,
+      outline: outline,
+      seed: seed,
+      radius: radius,
+      controlled: controlled,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _WoodBlockPainter oldDelegate) =>
+      fill != oldDelegate.fill ||
+      outline != oldDelegate.outline ||
+      controlled != oldDelegate.controlled ||
+      seed != oldDelegate.seed ||
+      radius != oldDelegate.radius;
 }
 
 class _MainGem extends StatelessWidget {
@@ -229,37 +194,4 @@ class _MainGem extends StatelessWidget {
       ),
     );
   }
-}
-
-class _BlockGrainPainter extends CustomPainter {
-  _BlockGrainPainter({required this.color, required this.horizontal});
-
-  final Color color;
-  final bool horizontal;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    if (horizontal) {
-      final step = size.height / 5;
-      for (var i = 1; i < 5; i++) {
-        final y = step * i;
-        canvas.drawLine(Offset(6, y), Offset(size.width - 6, y), paint);
-      }
-    } else {
-      final step = size.width / 5;
-      for (var i = 1; i < 5; i++) {
-        final x = step * i;
-        canvas.drawLine(Offset(x, 6), Offset(x, size.height - 6), paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BlockGrainPainter oldDelegate) =>
-      color != oldDelegate.color || horizontal != oldDelegate.horizontal;
 }

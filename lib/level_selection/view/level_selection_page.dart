@@ -169,12 +169,7 @@ class LevelSelectionPage extends StatelessWidget {
                                 isLocked: isLocked,
                                 isCompleted: snapshot.data ?? false,
                                 puzzle: Hero(
-                                  tag: context.select((NavigatorCubit cubit) {
-                                    final latestLevelName = cubit.latestLevelName;
-                                    return latestLevelName == level.name
-                                        ? 'puzzle'
-                                        : level.name;
-                                  }),
+                                  tag: level.name,
                                   child: BlocProvider(
                                     create: (context) =>
                                         LevelBloc(initialLevelState),
