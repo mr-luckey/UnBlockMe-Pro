@@ -22,32 +22,6 @@ subprojects {
             }
         }
     }
-
-    // assets_audio_player_web compiles Java with target 1.8; keep Kotlin target aligned.
-    if (project.name == "assets_audio_player_web") {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = JavaVersion.VERSION_1_8.toString()
-            }
-        }
-        tasks.withType(JavaCompile).configureEach {
-            sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-            targetCompatibility = JavaVersion.VERSION_1_8.toString()
-        }
-    }
-
-    // assets_audio_player also compiles Java with target 1.8 in its Android module.
-    if (project.name == "assets_audio_player") {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = JavaVersion.VERSION_1_8.toString()
-            }
-        }
-        tasks.withType(JavaCompile).configureEach {
-            sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-            targetCompatibility = JavaVersion.VERSION_1_8.toString()
-        }
-    }
 }
 
 tasks.register("clean", Delete) {

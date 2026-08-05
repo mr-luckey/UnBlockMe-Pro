@@ -50,7 +50,6 @@ class _LevelMapViewState extends State<_LevelMapView> {
   final _scroll = ScrollController();
   bool _didScroll = false;
 
-  static const _assets = 'assets/ui/map';
   static const double _padBottom = 20;
 
   @override

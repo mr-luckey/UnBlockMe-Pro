@@ -32,7 +32,6 @@ class LevelBloc extends Bloc<LevelEvent, LevelState> {
       if (newStates.isEmpty) return;
 
       // Only real gameplay levels play haptic/SFX — never the looping
-      // BackgroundPuzzleController LevelBloc.
       if (enableFeel) {
         final resultMove = newStates.last.latestMove;
         if (resultMove != null) {

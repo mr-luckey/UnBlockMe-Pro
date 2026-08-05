@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:blocked/ADs/ad_manager.dart';
+import 'package:blocked/ADs/ads_remote_config.dart';
 import 'package:blocked/audio/game_feel.dart';
 import 'package:blocked/audio/game_music.dart';
 import 'package:blocked/level/level.dart';
@@ -11,6 +12,7 @@ import 'package:blocked/settings/settings.dart';
 import 'package:blocked/theme/theme.dart';
 import 'package:blocked/theme/theme_presets.dart';
 import 'package:blocked/widgets/app_exit_scope.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -29,6 +31,16 @@ void main() async {
     }
     return false;
   };
+
+  // Firebase is optional until google-services.json / plist are added.
+  // AdsRemoteConfig falls back to in-code defaults when init fails.
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init skipped: $e');
+  }
+  unawaited(AdsRemoteConfig.instance.ensureInitialized());
+
   // Load during native splash only — no second Flutter splash screen.
   final results = await Future.wait<dynamic>([
     readLevelsFromYaml(),

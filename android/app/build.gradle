@@ -91,6 +91,10 @@ flutter {
 
 dependencies {
     implementation "com.google.android.gms:play-services-ads:25.1.0"
-    implementation 'com.facebook.infer.annotation:infer-annotation:0.18.0'
     implementation "androidx.multidex:multidex:2.0.1"
+}
+
+// Applied only after you add android/app/google-services.json from Firebase.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
 }

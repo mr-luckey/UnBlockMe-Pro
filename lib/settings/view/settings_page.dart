@@ -13,8 +13,6 @@ import 'package:google_fonts/google_fonts.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({Key? key}) : super(key: key);
 
-  static const _assets = 'assets/ui/home';
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);

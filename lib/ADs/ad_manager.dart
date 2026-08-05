@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:blocked/ADs/ads_remote_config.dart';
 import 'package:blocked/ADs/network_status.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -70,8 +71,7 @@ class AdManager with WidgetsBindingObserver {
     'ca-app-pub-5561438827097019/2862337799',
   ];
 
-  /// Gameplay must never be interrupted by two interstitials in a row.
-  static const _minInterstitialGap = Duration(seconds: 60);
+  AdsRemoteConfig get _rc => AdsRemoteConfig.instance;
 
   final ValueNotifier<BannerAd?> bannerAdNotifier =
       ValueNotifier<BannerAd?>(null);
@@ -141,10 +141,13 @@ class AdManager with WidgetsBindingObserver {
   bool get _isOfflinePaused =>
       _offlineUntil != null && DateTime.now().isBefore(_offlineUntil!);
 
-  /// True while ads may be requested — used by the UI to keep ad space at
-  /// zero height instead of showing an empty strip.
+  /// True while banner ads may be shown — UI keeps ad space at zero height
+  /// when this is false.
   bool get adsAvailable =>
-      _canRequestAds && !_isOfflinePaused && networkOnline.value;
+      _rc.bannerAdsEnabled &&
+      _canRequestAds &&
+      !_isOfflinePaused &&
+      networkOnline.value;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -169,10 +172,31 @@ class AdManager with WidgetsBindingObserver {
     final online = await hasInternetConnection(force: true);
     if (!online) return;
     _offlineUntil = null;
+    // Interval-gated; uses on-disk RC cache when fetch is not due.
+    await _rc.refreshIfNeeded();
+    _applyRemoteConfigToLoadedAds();
     if (!_didBootstrap) {
       unawaited(bootstrap());
     } else {
       ensureLoaded();
+    }
+  }
+
+  /// Drop banners that Remote Config has turned off so the UI collapses.
+  void _applyRemoteConfigToLoadedAds() {
+    if (!_rc.bannerAdsEnabled) {
+      final shell = _bannerAd;
+      final play = _playBannerAd;
+      _bannerAd = null;
+      _playBannerAd = null;
+      bannerAdNotifier.value = null;
+      playBannerAdNotifier.value = null;
+      _disposeBannerLater(shell);
+      _disposeBannerLater(play);
+    }
+    if (!_rc.interstitialAdsEnabled) {
+      _interstitialAd?.dispose();
+      _interstitialAd = null;
     }
   }
 
@@ -317,6 +341,8 @@ class AdManager with WidgetsBindingObserver {
   }) async {
     if (_bootstrapping) return;
     _attachLifecycle();
+    await _rc.ensureInitialized();
+    _applyRemoteConfigToLoadedAds();
     if (_isOfflinePaused) {
       _log('bootstrap skipped — offline pause active');
       _scheduleOfflineWake();
@@ -343,7 +369,10 @@ class AdManager with WidgetsBindingObserver {
 
       _didBootstrap = true;
 
-      if (banner) {
+      final wantBanner = banner && _rc.bannerAdsEnabled;
+      final wantInterstitial = interstitial && _rc.interstitialAdsEnabled;
+
+      if (wantBanner) {
         _bannerLoading = false;
         loadBannerAd(force: true);
         Future<void>.delayed(const Duration(milliseconds: 900), () {
@@ -353,12 +382,13 @@ class AdManager with WidgetsBindingObserver {
         });
       }
 
-      if (interstitial) {
+      if (wantInterstitial) {
         await Future<void>.delayed(const Duration(milliseconds: 400));
         _interstitialLoading = false;
         loadInterstitialAd(force: true);
       }
 
+      // Rewarded is never gated by Remote Config (always enabled).
       if (rewarded) {
         await Future<void>.delayed(const Duration(milliseconds: 400));
         prefetchRewardedAds();
@@ -381,8 +411,13 @@ class AdManager with WidgetsBindingObserver {
       unawaited(bootstrap());
       return;
     }
-    if (_bannerAd == null && !_bannerLoading) loadBannerAd();
-    if (_interstitialAd == null && !_interstitialLoading) {
+    _applyRemoteConfigToLoadedAds();
+    if (_rc.bannerAdsEnabled && _bannerAd == null && !_bannerLoading) {
+      loadBannerAd();
+    }
+    if (_rc.interstitialAdsEnabled &&
+        _interstitialAd == null &&
+        !_interstitialLoading) {
       loadInterstitialAd();
     }
     prefetchRewardedAds();
@@ -433,6 +468,7 @@ class AdManager with WidgetsBindingObserver {
   }
 
   Future<void> loadBannerAd({bool force = false}) async {
+    if (!_rc.bannerAdsEnabled) return;
     if (!_canRequestAds) return;
     if (_isOfflinePaused) return;
     if (!_sdkReady) {
@@ -529,6 +565,7 @@ class AdManager with WidgetsBindingObserver {
 
   /// Gameplay-only banner (separate instance from the shell banner).
   Future<void> loadPlayBannerAd({bool force = false}) async {
+    if (!_rc.bannerAdsEnabled) return;
     if (!_canRequestAds) return;
     if (_isOfflinePaused) return;
     if (!_sdkReady) {
@@ -644,6 +681,7 @@ class AdManager with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   void loadInterstitialAd({bool force = false}) {
+    if (!_rc.interstitialAdsEnabled) return;
     if (!_canRequestAds) return;
     if (_isOfflinePaused) return;
     if (!_sdkReady) return;
@@ -706,18 +744,18 @@ class AdManager with WidgetsBindingObserver {
   /// Shows an interstitial if pacing allows it. Always resolves — callers can
   /// safely `await` this before navigating.
   Future<bool> showInterstitial() async {
+    if (!_rc.interstitialAdsEnabled) return false;
     if (!_canRequestAds || _isOfflinePaused || !_isForeground) return false;
 
     _interstitialOpportunities++;
-    // Standard game pacing: let the player finish one level ad-free, then keep
-    // at least a minute between full screen ads.
-    if (_interstitialOpportunities <= 1) {
+    // Remote Config: skip first opportunity (default true) and min gap (60s).
+    if (_rc.interstitialSkipFirst && _interstitialOpportunities <= 1) {
       loadInterstitialAd();
       return false;
     }
     final last = _lastInterstitialAt;
     if (last != null &&
-        DateTime.now().difference(last) < _minInterstitialGap) {
+        DateTime.now().difference(last) < _rc.interstitialMinInterval) {
       return false;
     }
 

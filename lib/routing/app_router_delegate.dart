@@ -1,4 +1,3 @@
-import 'package:blocked/background/background.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/puzzle/puzzle.dart';
@@ -31,68 +30,66 @@ class AppRouterDelegate extends RouterDelegate<AppRoutePath>
   Widget build(BuildContext context) {
     return BoardColor(
       data: BoardColorData.fromColorScheme(Theme.of(context).colorScheme),
-      child: BackgroundPuzzleController(
-        child: BlocConsumer<NavigatorCubit, AppRoutePath>(
-          bloc: navigatorCubit,
-          listenWhen: (previous, current) => true,
-          listener: (context, state) {
-            notifyListeners();
-          },
-          builder: (context, state) {
-            final path = state;
-            final levelPath = path is LevelRoutePath ? path : null;
-            final inLevel = levelPath?.levelName != null &&
-                levelPath?.chapterName != null;
+      child: BlocConsumer<NavigatorCubit, AppRoutePath>(
+        bloc: navigatorCubit,
+        listenWhen: (previous, current) => true,
+        listener: (context, state) {
+          notifyListeners();
+        },
+        builder: (context, state) {
+          final path = state;
+          final levelPath = path is LevelRoutePath ? path : null;
+          final inLevel = levelPath?.levelName != null &&
+              levelPath?.chapterName != null;
 
-            return BlocProvider.value(
-              value: navigatorCubit,
-              child: Navigator(
-                key: _navigatorKey,
-                pages: [
-                  // Single persistent shell — tab switches are IndexedStack only.
+          return BlocProvider.value(
+            value: navigatorCubit,
+            child: Navigator(
+              key: _navigatorKey,
+              pages: [
+                // Single persistent shell — tab switches are IndexedStack only.
+                MaterialPage(
+                  key: const ValueKey('main-shell'),
+                  child: MainShell(chapters: chapters),
+                ),
+
+                if (inLevel)
                   MaterialPage(
-                    key: const ValueKey('main-shell'),
-                    child: MainShell(chapters: chapters),
-                  ),
-
-                  if (inLevel)
-                    MaterialPage(
-                      key: ValueKey(levelPath!.location),
-                      child: ScaffoldMessenger(
-                        child: Scaffold(
-                          backgroundColor: Colors.transparent,
-                          body: LevelPage(
-                            chapters
-                                .expand((c) => c.levels)
-                                .firstWhere(
-                                    (l) => l.name == levelPath.levelName!)
-                                .toLevel(),
-                            boardControls: const BoardControls(),
-                            key: Key(levelPath.levelName!),
-                            levelNumber: () {
-                              final i = flatLevels.indexWhere(
-                                  (f) => f.level.name == levelPath.levelName!);
-                              return i < 0 ? 1 : i + 1;
-                            }(),
-                            onExit: () =>
-                                navigatorCubit.navigateToChapterSelection(),
-                            onNext: () => _goNext(levelPath.levelName!),
-                          ),
+                    key: ValueKey(levelPath!.location),
+                    child: ScaffoldMessenger(
+                      child: Scaffold(
+                        backgroundColor: Colors.transparent,
+                        body: LevelPage(
+                          chapters
+                              .expand((c) => c.levels)
+                              .firstWhere(
+                                  (l) => l.name == levelPath.levelName!)
+                              .toLevel(),
+                          boardControls: const BoardControls(),
+                          key: Key(levelPath.levelName!),
+                          levelNumber: () {
+                            final i = flatLevels.indexWhere(
+                                (f) => f.level.name == levelPath.levelName!);
+                            return i < 0 ? 1 : i + 1;
+                          }(),
+                          onExit: () =>
+                              navigatorCubit.navigateToChapterSelection(),
+                          onNext: () => _goNext(levelPath.levelName!),
                         ),
                       ),
                     ),
-                ],
-                onPopPage: (route, result) {
-                  if (!route.didPop(result)) {
-                    return false;
-                  }
-                  navigatorCubit.navigateToPreviousPage();
-                  return true;
-                },
-              ),
-            );
-          },
-        ),
+                  ),
+              ],
+              onPopPage: (route, result) {
+                if (!route.didPop(result)) {
+                  return false;
+                }
+                navigatorCubit.navigateToPreviousPage();
+                return true;
+              },
+            ),
+          );
+        },
       ),
     );
   }
