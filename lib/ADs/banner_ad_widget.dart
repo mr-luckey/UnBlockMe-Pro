@@ -4,11 +4,11 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum BannerAdSlot { shell, play }
 
-/// Banner strip. Takes **zero** height when no ad is loaded so layout
-/// stays fully responsive / unchanged.
+/// Banner strip. Takes **zero** height when no ad is loaded — offline or
+/// no-fill therefore never leaves an empty band in the layout.
 ///
-/// Only one [AdWidget] may host a given [BannerAd] — detach the old widget
-/// before mounting a new one (next frame) when the ad instance changes.
+/// Only one [AdWidget] may host a given [BannerAd] — the old widget is
+/// detached for a frame before the new one is mounted when the ad changes.
 class BannerAdBar extends StatefulWidget {
   const BannerAdBar({
     Key? key,
@@ -36,7 +36,7 @@ class _BannerAdBarState extends State<BannerAdBar> {
   void initState() {
     super.initState();
     _notifier.addListener(_onAdChanged);
-    _syncAd(_notifier.value);
+    _scheduleMount(_notifier.value);
   }
 
   @override
@@ -45,18 +45,18 @@ class _BannerAdBarState extends State<BannerAdBar> {
     super.dispose();
   }
 
-  void _onAdChanged() => _syncAd(_notifier.value);
-
-  void _syncAd(BannerAd? ad) {
-    if (_shownAd == ad) return;
-    if (!mounted) return;
-
-    // Drop the current AdWidget first so the same BannerAd is never double-mounted.
+  void _onAdChanged() {
+    final ad = _notifier.value;
+    if (_shownAd == ad || !mounted) return;
+    // Detach the current AdWidget first so one BannerAd is never mounted twice.
     setState(() => _shownAd = null);
-    if (ad == null) return;
+    _scheduleMount(ad);
+  }
 
+  void _scheduleMount(BannerAd? ad) {
+    if (ad == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _notifier.value != ad) return;
+      if (!mounted || _notifier.value != ad || _shownAd == ad) return;
       setState(() => _shownAd = ad);
     });
   }
@@ -70,6 +70,8 @@ class _BannerAdBarState extends State<BannerAdBar> {
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
     final bg = widget.backgroundColor ?? const Color(0xFF1A0E08);
+    final adWidth = ad.size.width.toDouble();
+    final adHeight = ad.size.height.toDouble();
 
     return ColoredBox(
       color: bg,
@@ -78,14 +80,20 @@ class _BannerAdBarState extends State<BannerAdBar> {
         children: [
           SizedBox(
             width: double.infinity,
-            height: ad.size.height.toDouble(),
-            child: Center(
-              child: SizedBox(
-                width: ad.size.width.toDouble(),
-                height: ad.size.height.toDouble(),
-                child: AdWidget(
-                  key: ValueKey('ad-${widget.slot.name}-${identityHashCode(ad)}'),
-                  ad: ad,
+            height: adHeight,
+            // Rotating after the size was measured can leave the ad wider than
+            // the screen for one load cycle — clip instead of overflowing.
+            child: ClipRect(
+              child: Center(
+                child: SizedBox(
+                  width: adWidth,
+                  height: adHeight,
+                  child: AdWidget(
+                    key: ValueKey(
+                      'ad-${widget.slot.name}-${identityHashCode(ad)}',
+                    ),
+                    ad: ad,
+                  ),
                 ),
               ),
             ),

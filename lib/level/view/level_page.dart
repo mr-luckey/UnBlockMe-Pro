@@ -5,6 +5,7 @@ import 'package:blocked/ADs/banner_ad_widget.dart';
 import 'package:blocked/audio/game_feel.dart';
 import 'package:blocked/level/cubit/level_hud_cubit.dart';
 import 'package:blocked/level/level.dart';
+import 'package:blocked/level/view/first_level_tutorial.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/progress/progress.dart';
 import 'package:blocked/puzzle/puzzle.dart';
@@ -366,6 +367,8 @@ class _LevelPageViewState extends State<_LevelPageView> {
                             ),
                           ],
                         ),
+                        if (levelNo == 1)
+                          FirstLevelTutorial(levelState: state),
                       ],
                     );
                   },
@@ -387,38 +390,40 @@ class _LevelPageViewState extends State<_LevelPageView> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black54,
+      barrierColor: const Color(0xE61A0D04),
       builder: (dialogContext) {
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-          child: _LevelCompletePanel(
-            levelName: widget.level.name,
-            stars: stars,
-            moves: moveCount,
-            bestMoves: hud.state.bestMoves ?? moveCount,
-            time: _formatDuration(hud.elapsed),
-            coins: stars * 25,
-            onNext: () async {
-              Navigator.pop(dialogContext);
-              await AdManager().showInterstitial();
-              if (!context.mounted) return;
-              context.read<LevelNavigation>().onNext();
-            },
-            onPlayAgain: () {
-              Navigator.pop(dialogContext);
-              context.read<LevelBloc>().add(const LevelReset());
-              _savedCompletion = false;
-              _shownWinSheet = false;
-              context.read<LevelHudCubit>().resetTimer();
-            },
-            onHome: () async {
-              Navigator.pop(dialogContext);
-              await AdManager().showInterstitial();
-              if (!context.mounted) return;
-              context.read<NavigatorCubit>().navigateToHome();
-            },
+          child: _ResultBackdrop(
+            child: _LevelCompletePanel(
+              levelName: widget.level.name,
+              stars: stars,
+              moves: moveCount,
+              bestMoves: hud.state.bestMoves ?? moveCount,
+              time: _formatDuration(hud.elapsed),
+              coins: stars * 25,
+              onNext: () async {
+                Navigator.pop(dialogContext);
+                await AdManager().showInterstitial();
+                if (!context.mounted) return;
+                context.read<LevelNavigation>().onNext();
+              },
+              onPlayAgain: () {
+                Navigator.pop(dialogContext);
+                context.read<LevelBloc>().add(const LevelReset());
+                _savedCompletion = false;
+                _shownWinSheet = false;
+                context.read<LevelHudCubit>().resetTimer();
+              },
+              onHome: () async {
+                Navigator.pop(dialogContext);
+                await AdManager().showInterstitial();
+                if (!context.mounted) return;
+                context.read<NavigatorCubit>().navigateToHome();
+              },
+            ),
           ),
         );
       },
@@ -637,6 +642,40 @@ class _PauseAction extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Solid dark-brown board behind the result content — the panel used to sit on
+/// a transparent dialog, so the gameplay screen showed through it.
+class _ResultBackdrop extends StatelessWidget {
+  const _ResultBackdrop({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = (MediaQuery.sizeOf(context).height / 840).clamp(0.78, 1.05);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(14 * s, 16 * s, 14 * s, 16 * s),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF4A2A12), Color(0xFF2C1708), Color(0xFF1A0D04)],
+        ),
+        border: Border.all(color: const Color(0xFF8B5A2B), width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.55),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }
