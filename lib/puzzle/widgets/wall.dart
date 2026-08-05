@@ -7,7 +7,6 @@ class PuzzleWall extends StatelessWidget {
     this.segment, {
     Key? key,
     required this.isSharp,
-    this.thickness,
     this.curve = Curves.linear,
     this.duration = const Duration(milliseconds: 0),
   }) : super(key: key);
@@ -15,9 +14,6 @@ class PuzzleWall extends StatelessWidget {
   final bool isSharp;
   final Segment segment;
 
-  /// Cross-axis thickness of the wall. Defaults to [kWallWidth]. A thinner
-  /// wall stays centered on the line it would normally occupy.
-  final double? thickness;
   final Curve curve;
   final Duration duration;
 
@@ -29,16 +25,15 @@ class PuzzleWall extends StatelessWidget {
     final horizontal = segment.width >= segment.height;
     final fullWidth = segment.width.toWallSize();
     final fullHeight = segment.height.toWallSize();
-    final isThin = thickness != null && thickness != kWallWidth;
 
-    final body = Transform.scale(
+    return Transform.scale(
       scaleX: (isSharp && segment.width == 0 ? 2 : 1),
       scaleY: (isSharp && segment.height == 0 ? 2 : 1),
       child: AnimatedContainer(
         curve: curve,
         duration: duration,
-        width: isThin && segment.width == 0 ? thickness : fullWidth,
-        height: isThin && segment.height == 0 ? thickness : fullHeight,
+        width: fullWidth,
+        height: fullHeight,
         decoration: isSharp
             ? ShapeDecoration(
                 shape: BeveledRectangleBorder(
@@ -80,44 +75,6 @@ class PuzzleWall extends StatelessWidget {
                 ],
               ),
       ),
-    );
-
-    if (!isThin) {
-      return body;
-    }
-
-    return SizedBox(
-      width: fullWidth,
-      height: fullHeight,
-      child: Center(child: body),
-    );
-  }
-}
-
-class PuzzleExit extends StatelessWidget {
-  const PuzzleExit(this.segment, {Key? key}) : super(key: key);
-
-  final Segment segment;
-
-  @override
-  Widget build(BuildContext context) {
-    final outline = BoardColor.of(context).controlledBlockOutline;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(3),
-        border: Border.all(
-          color: outline.withValues(alpha: 0.85),
-          width: 2.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: outline.withValues(alpha: 0.35),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      width: segment.width.toWallSize(),
-      height: segment.height.toWallSize(),
     );
   }
 }

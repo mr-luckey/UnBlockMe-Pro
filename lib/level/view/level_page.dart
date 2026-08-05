@@ -288,32 +288,27 @@ class _LevelPageViewState extends State<_LevelPageView> {
                                 child: Center(
                                   child: AspectRatio(
                                     aspectRatio: 1,
-                                    child: _BoardFrame(
-                                      scale: s,
-                                      child: FittedBox(
-                                        child: Hero(
-                                          tag: 'puzzle',
-                                          flightShuttleBuilder: (
-                                            flightContext,
-                                            animation,
-                                            flightDirection,
-                                            fromHeroContext,
-                                            toHeroContext,
-                                          ) {
-                                            final toHero =
-                                                toHeroContext.widget as Hero;
-                                            return BlocProvider.value(
-                                              value:
-                                                  context.read<LevelBloc>(),
-                                              child: Material(
-                                                type:
-                                                    MaterialType.transparency,
-                                                child: toHero.child,
-                                              ),
-                                            );
-                                          },
-                                          child: const Puzzle(),
-                                        ),
+                                    child: FittedBox(
+                                      child: Hero(
+                                        tag: 'puzzle',
+                                        flightShuttleBuilder: (
+                                          flightContext,
+                                          animation,
+                                          flightDirection,
+                                          fromHeroContext,
+                                          toHeroContext,
+                                        ) {
+                                          final toHero =
+                                              toHeroContext.widget as Hero;
+                                          return BlocProvider.value(
+                                            value: context.read<LevelBloc>(),
+                                            child: Material(
+                                              type: MaterialType.transparency,
+                                              child: toHero.child,
+                                            ),
+                                          );
+                                        },
+                                        child: const Puzzle(),
                                       ),
                                     ),
                                   ),
@@ -455,142 +450,6 @@ String _formatDuration(Duration value) {
   final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
-}
-
-/// Carved multi-layer wood frame around the live puzzle board.
-class _BoardFrame extends StatelessWidget {
-  const _BoardFrame({required this.scale, required this.child});
-
-  final double scale;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    final outerR = BorderRadius.circular(30 * s);
-    final midR = BorderRadius.circular(24 * s);
-    final innerR = BorderRadius.circular(18 * s);
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: outerR,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFD4A574),
-            Color(0xFFA06B3A),
-            Color(0xFF6B3F1F),
-            Color(0xFF4A2A12),
-          ],
-          stops: [0, 0.35, 0.7, 1],
-        ),
-        border: Border.all(color: const Color(0xFFF0D9A8), width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: const Color(0xFFFFE0A8).withValues(alpha: 0.18),
-            blurRadius: 8,
-            spreadRadius: -1,
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(5 * s),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: midR,
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF8B5A2B),
-              Color(0xFF5C3818),
-            ],
-          ),
-          border: Border.all(
-            color: const Color(0xFF3A2210),
-            width: 2,
-          ),
-        ),
-        padding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.all(8 * s),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: innerR,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF2A180C),
-                        Color(0xFF1A0E08),
-                        Color(0xFF120A06),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFFC4956A).withValues(alpha: 0.45),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        blurRadius: 10,
-                        spreadRadius: -2,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: child,
-                ),
-              ),
-            ),
-            // Corner studs on the wood rim
-            ..._cornerStuds(s),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _cornerStuds(double s) {
-    final stud = (7.0 * s).clamp(5.0, 9.0);
-    Widget peg(Alignment a) => Align(
-          alignment: a,
-          child: Container(
-            width: stud,
-            height: stud,
-            margin: EdgeInsets.all(2 * s),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const RadialGradient(
-                colors: [Color(0xFFF0D9A8), Color(0xFF8B5A2B)],
-              ),
-              border: Border.all(color: const Color(0xFF3A2210), width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
-        );
-    return [
-      peg(Alignment.topLeft),
-      peg(Alignment.topRight),
-      peg(Alignment.bottomLeft),
-      peg(Alignment.bottomRight),
-    ];
-  }
 }
 
 class _PlayHeader extends StatelessWidget {

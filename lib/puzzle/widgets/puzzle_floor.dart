@@ -39,18 +39,6 @@ class PuzzleFloor extends StatelessWidget {
         colors: [lift, floor, deep],
         stops: const [0, 0.45, 1],
       ),
-      border: Border.all(
-        color: Color.lerp(wall, Colors.black, 0.25)!,
-        width: 1.5,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.35),
-          blurRadius: 8,
-          offset: const Offset(0, 3),
-          spreadRadius: -1,
-        ),
-      ],
     );
 
     final content = Stack(

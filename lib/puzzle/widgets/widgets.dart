@@ -1,5 +1,6 @@
 export 'board_colors.dart';
 export 'board_controls.dart';
+export 'board_frame.dart';
 export 'board_painter.dart';
 export 'level_shortcut_listener.dart';
 export 'puzzle.dart';

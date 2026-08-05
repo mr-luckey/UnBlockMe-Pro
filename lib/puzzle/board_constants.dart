@@ -1,9 +1,6 @@
 const kBlockSize = 64.0;
 const kBlockGap = 4.0;
 const kWallWidth = 8.0;
-
-/// Thickness used for the boundary line that contains the exit opening.
-const kExitEdgeWallWidth = 3.0;
 const kBlockToBlockGap = 2 * kBlockGap + kWallWidth;
 const kBlockSizeInterval = 2 * kBlockGap + kWallWidth + kBlockSize;
 const kSlideDuration = Duration(milliseconds: 150);

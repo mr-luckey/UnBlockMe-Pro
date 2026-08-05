@@ -40,13 +40,6 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
         context.select((LevelBloc bloc) => bloc.state.isCompleted);
 
     final exits = _getExits(board.width, board.height, board.walls);
-    final exitEdges = <_BoardEdge>{};
-    for (final exit in exits) {
-      final edge = _edgeOf(exit, board.width, board.height);
-      if (edge != null) {
-        exitEdges.add(edge);
-      }
-    }
 
     return RepaintBoundary(
       child: FittedBox(
@@ -61,101 +54,92 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
               await _controller.reverse();
             }
           },
-          child: PuzzleFloor.container(
-            width: board.width,
-            height: board.height,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.topLeft,
-              children: [
-                for (var block in board.blocks)
-                  AnimatedPositioned(
-                    key: ValueKey(board.blocks.indexOf(block)),
-                    duration: kSlideDuration,
-                    curve: Curves.easeInOutCubic,
-                    left: block.left.toBlockOffset(),
-                    top: block.top.toBlockOffset(),
-                    child: AnimatedOpacity(
-                      opacity: board.isCompleted && block.isMain ? 0 : 1,
+          child: BoardFrame(
+            boardWidth: board.width,
+            boardHeight: board.height,
+            exits: exits,
+            child: PuzzleFloor.container(
+              width: board.width,
+              height: board.height,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topLeft,
+                children: [
+                  for (var block in board.blocks)
+                    AnimatedPositioned(
+                      key: ValueKey(board.blocks.indexOf(block)),
                       duration: kSlideDuration,
-                      child: SlideTransition(
-                        position: (block.position == latestMove?.block.position
-                                ? _controller
-                                : const AlwaysStoppedAnimation(0.0))
-                            .drive(CurveTween(curve: Curves.easeInOutCubic))
-                            .drive(Tween(
-                                begin: Offset.zero,
-                                end: Offset.fromDirection(
-                                    latestMove?.direction.toRadians() ?? 0,
-                                    ((2 * kBlockGap + kWallWidth) /
-                                            kBlockSize) /
-                                        (latestMove?.direction.isVertical ??
-                                                false
-                                            ? block.height
-                                            : block.width)))),
-                        child: PuzzleBlock(block),
+                      curve: Curves.easeInOutCubic,
+                      left: block.left.toBlockOffset(),
+                      top: block.top.toBlockOffset(),
+                      child: AnimatedOpacity(
+                        opacity: board.isCompleted && block.isMain ? 0 : 1,
+                        duration: kSlideDuration,
+                        child: SlideTransition(
+                          position: (block.position ==
+                                      latestMove?.block.position
+                                  ? _controller
+                                  : const AlwaysStoppedAnimation(0.0))
+                              .drive(CurveTween(curve: Curves.easeInOutCubic))
+                              .drive(Tween(
+                                  begin: Offset.zero,
+                                  end: Offset.fromDirection(
+                                      latestMove?.direction.toRadians() ?? 0,
+                                      ((2 * kBlockGap + kWallWidth) /
+                                              kBlockSize) /
+                                          (latestMove?.direction.isVertical ??
+                                                  false
+                                              ? block.height
+                                              : block.width)))),
+                          child: PuzzleBlock(block),
+                        ),
                       ),
                     ),
-                  ),
-                for (var wall in board.walls)
-                  Positioned(
-                    left: wall.start.x.toWallOffset(),
-                    top: wall.start.y.toWallOffset(),
-                    child: PuzzleWall(
-                      wall,
-                      isSharp: false,
-                      thickness: exitEdges
-                              .contains(_edgeOf(wall, board.width, board.height))
-                          ? kExitEdgeWallWidth
-                          : null,
-                    ),
-                  ),
-                for (var wall in board.sharpWalls)
-                  Positioned(
-                    left: wall.start.x.toWallOffset(),
-                    top: wall.start.y.toWallOffset(),
-                    child: PuzzleWall(
-                      wall,
-                      isSharp: true,
-                    ),
-                  ),
-                for (var exit in exits)
-                  Positioned(
-                    left: exit.start.x.toWallOffset(),
-                    top: exit.start.y.toWallOffset(),
-                    width: exit.width.toWallSize(),
-                    height: exit.height.toWallSize(),
-                    child: Center(
-                      child: _ExitLabel(
-                        segment: exit,
-                        boardWidth: board.width,
-                        boardHeight: board.height,
+                  // Boundary walls are part of the frame artwork, not separate
+                  // wall segments.
+                  for (var wall in board.walls)
+                    if (!_isBoundary(wall, board.width, board.height))
+                      Positioned(
+                        left: wall.start.x.toWallOffset(),
+                        top: wall.start.y.toWallOffset(),
+                        child: PuzzleWall(wall, isSharp: false),
+                      ),
+                  for (var wall in board.sharpWalls)
+                    Positioned(
+                      left: wall.start.x.toWallOffset(),
+                      top: wall.start.y.toWallOffset(),
+                      child: PuzzleWall(
+                        wall,
+                        isSharp: true,
                       ),
                     ),
-                  ),
-                Positioned.fill(
-                  child: AnimatedOpacity(
-                    opacity: isCompleted ? 1 : 0,
-                    duration: kSlideDuration,
-                    child: Container(
-                      color: Theme.of(context).colorScheme.scrim.withOpacity(0.5),
-                      child: AnimatedScale(
-                        scale: isCompleted ? 1 : 0,
-                        duration: kSlideDuration * 5,
-                        curve: const Interval(1 / 3, 1.0,
-                            curve: Curves.elasticOut),
-                        child: FittedBox(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Icon(Icons.check,
-                                color: BoardColor.of(context).checkmark),
+                  Positioned.fill(
+                    child: AnimatedOpacity(
+                      opacity: isCompleted ? 1 : 0,
+                      duration: kSlideDuration,
+                      child: Container(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .scrim
+                            .withOpacity(0.5),
+                        child: AnimatedScale(
+                          scale: isCompleted ? 1 : 0,
+                          duration: kSlideDuration * 5,
+                          curve: const Interval(1 / 3, 1.0,
+                              curve: Curves.elasticOut),
+                          child: FittedBox(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Icon(Icons.check,
+                                  color: BoardColor.of(context).checkmark),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -183,59 +167,13 @@ List<Segment> _getExits(
   return exits;
 }
 
-enum _BoardEdge { top, bottom, left, right }
-
-/// The board edge a segment lies on, or `null` if it is not on the boundary.
-_BoardEdge? _edgeOf(Segment segment, int boardWidth, int boardHeight) {
-  if (segment.isHorizontal && segment.width > 0) {
-    if (segment.start.y == 0) return _BoardEdge.top;
-    if (segment.start.y == boardHeight) return _BoardEdge.bottom;
-  }
-  if (segment.isVertical && segment.height > 0) {
-    if (segment.start.x == 0) return _BoardEdge.left;
-    if (segment.start.x == boardWidth) return _BoardEdge.right;
-  }
-  return null;
-}
-
-class _ExitLabel extends StatelessWidget {
-  const _ExitLabel({
-    required this.segment,
-    required this.boardWidth,
-    required this.boardHeight,
-  });
-
-  final Segment segment;
-  final int boardWidth;
-  final int boardHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    final openingLength =
-        max(segment.width.toWallSize(), segment.height.toWallSize());
-    final iconSize = (openingLength * 0.52).clamp(12.0, 26.0);
-
-    final arrow = Icon(
-      Icons.arrow_forward_rounded,
-      size: iconSize,
-      color: Theme.of(context).colorScheme.primary,
-    );
-
-    // The arrow points along the path the block takes out of the board.
-    switch (_edgeOf(segment, boardWidth, boardHeight)) {
-      case _BoardEdge.right:
-        return arrow;
-      case _BoardEdge.bottom:
-        return RotatedBox(quarterTurns: 1, child: arrow);
-      case _BoardEdge.left:
-        return RotatedBox(quarterTurns: 2, child: arrow);
-      case _BoardEdge.top:
-        return RotatedBox(quarterTurns: 3, child: arrow);
-      case null:
-        return arrow;
-    }
-  }
-}
+/// Whether a segment lies entirely on the board boundary, in which case the
+/// frame already covers it.
+bool _isBoundary(Segment segment, int boardWidth, int boardHeight) =>
+    (segment.start.x == 0 && segment.end.x == 0) ||
+    (segment.start.x == boardWidth && segment.end.x == boardWidth) ||
+    (segment.start.y == 0 && segment.end.y == 0) ||
+    (segment.start.y == boardHeight && segment.end.y == boardHeight);
 
 extension on MoveDirection {
   double toRadians() {
