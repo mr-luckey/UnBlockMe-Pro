@@ -19,117 +19,111 @@ void paintWoodBlock(
   required Color fill,
   required Color outline,
   required int seed,
-  double radius = 10,
+  double radius = 5,
   bool controlled = false,
 }) {
   if (rect.width <= 0 || rect.height <= 0) return;
 
   final shortest = math.min(rect.width, rect.height);
-  final chamfer = (shortest * 0.13).clamp(2.5, 9.0);
+  // How far the rounded-over edge reaches in from the outline.
+  final edge = (shortest * 0.16).clamp(3.0, 11.0);
   final outer = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-  final face = rect.deflate(chamfer);
-  if (face.width <= 0 || face.height <= 0) return;
-  final inner = RRect.fromRectAndRadius(
-    face,
-    Radius.circular(math.max(2, radius - chamfer * 0.55)),
-  );
 
   // Grain runs the length of the piece, the way a sawn plank would.
   final alongWidth = rect.width >= rect.height;
 
-  final lit = Color.lerp(fill, _sun, 0.46)!;
-  final dim = Color.lerp(fill, _pitch, 0.52)!;
+  final lit = Color.lerp(fill, _sun, 0.5)!;
+  final dim = Color.lerp(fill, _pitch, 0.55)!;
 
   canvas
     ..save()
     ..clipRRect(outer);
 
-  // Four cut faces around the top face. Corners fall where the quads meet, so
-  // the chamfer mitres itself.
-  void cut(Offset a, Offset b, Offset c, Offset d, Color color) {
-    canvas.drawPath(
-      Path()..addPolygon([a, b, c, d], true),
-      Paint()..color = color,
-    );
-  }
-
-  canvas.drawRRect(outer, Paint()..color = fill);
-  cut(rect.topLeft, rect.topRight, face.topRight, face.topLeft,
-      Color.lerp(lit, _sun, 0.16)!);
-  cut(rect.topLeft, face.topLeft, face.bottomLeft, rect.bottomLeft,
-      Color.lerp(fill, lit, 0.6)!);
-  cut(rect.topRight, rect.bottomRight, face.bottomRight, face.topRight,
-      Color.lerp(fill, dim, 0.7)!);
-  cut(rect.bottomLeft, face.bottomLeft, face.bottomRight, rect.bottomRight,
-      dim);
-
-  // The top face carries a shallow barrel of light across the grain.
-  canvas.drawRRect(
-    inner,
-    Paint()
-      ..shader = LinearGradient(
-        begin: alongWidth ? Alignment.topCenter : Alignment.centerLeft,
-        end: alongWidth ? Alignment.bottomCenter : Alignment.centerRight,
-        colors: [
-          Color.lerp(fill, lit, 0.72)!,
-          Color.lerp(fill, lit, 0.26)!,
-          fill,
-          Color.lerp(fill, dim, 0.34)!,
-        ],
-        stops: const [0, 0.3, 0.64, 1],
-      ).createShader(face),
-  );
-
-  canvas
-    ..save()
-    ..clipRRect(inner);
-  _paintGrain(canvas, face, lit, dim, alongWidth, seed);
-  // Diagonal sheen so the light direction matches the chamfer.
-  canvas
-    ..drawRect(
-      face,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.14),
-            Colors.white.withValues(alpha: 0),
-            Colors.black.withValues(alpha: 0.15),
-          ],
-          stops: const [0, 0.45, 1],
-        ).createShader(face),
-    )
-    ..restore();
-
-  // Hairline where the chamfer meets the face: bright on the lit side, dark on
-  // the far side. This is what sells the step up out of the board.
+  // One solid piece of timber: the whole face is wood, with a shallow barrel of
+  // light running across the grain.
   canvas
     ..drawRRect(
-      inner,
+      outer,
       Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1
+        ..shader = LinearGradient(
+          begin: alongWidth ? Alignment.topCenter : Alignment.centerLeft,
+          end: alongWidth ? Alignment.bottomCenter : Alignment.centerRight,
+          colors: [
+            Color.lerp(fill, lit, 0.5)!,
+            Color.lerp(fill, lit, 0.14)!,
+            fill,
+            Color.lerp(fill, dim, 0.3)!,
+          ],
+          stops: const [0, 0.32, 0.66, 1],
+        ).createShader(rect),
+    )
+    ..drawRect(
+      rect,
+      Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            _sun.withValues(alpha: 0.45),
-            Colors.transparent,
-            _pitch.withValues(alpha: 0.5),
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0),
+            Colors.black.withValues(alpha: 0.12),
           ],
-          stops: const [0, 0.5, 1],
-        ).createShader(face),
+          stops: const [0, 0.45, 1],
+        ).createShader(rect),
+    );
+
+  _paintGrain(canvas, rect, lit, dim, alongWidth, seed);
+
+  // The rounded-over edge, drawn as a soft stroke of the outline itself. Being
+  // the same shape it stays concentric and melts into the face, so the piece
+  // never reads as a box sitting inside another box.
+  final edgeShader = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color.lerp(fill, _sun, 0.66)!,
+      Color.lerp(fill, _sun, 0.1)!.withValues(alpha: 0.45),
+      Color.lerp(fill, _pitch, 0.34)!.withValues(alpha: 0.55),
+      Color.lerp(fill, _pitch, 0.74)!,
+    ],
+    stops: const [0, 0.34, 0.6, 1],
+  ).createShader(rect);
+
+  canvas
+    ..drawRRect(
+      outer.deflate(edge / 2),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = edge
+        ..shader = edgeShader
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, edge * 0.42),
+    )
+    // A crisper catch of light right on the lip.
+    ..drawRRect(
+      outer.deflate(1.3),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            _sun.withValues(alpha: 0.58),
+            Colors.transparent,
+            _pitch.withValues(alpha: 0.55),
+          ],
+          stops: const [0, 0.48, 1],
+        ).createShader(rect),
     )
     ..restore();
 
   canvas.drawRRect(
-    outer.deflate(0.8),
+    outer.deflate(0.7),
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..color = Color.lerp(outline, _pitch, controlled ? 0.2 : 0.4)!
-          .withValues(alpha: controlled ? 0.95 : 0.75),
+      ..strokeWidth = 1.4
+      ..color = Color.lerp(outline, _pitch, controlled ? 0.25 : 0.45)!
+          .withValues(alpha: controlled ? 0.9 : 0.7),
   );
 }
 

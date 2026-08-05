@@ -37,7 +37,7 @@ class PuzzleBlock extends StatelessWidget {
         ? boardColors.controlledBlockOutline
         : const Color(0xFFFFC857);
 
-    final radius = BorderRadius.circular(12);
+    final radius = BorderRadius.circular(8);
 
     return RepaintBoundary(
       child: SizedBox(
