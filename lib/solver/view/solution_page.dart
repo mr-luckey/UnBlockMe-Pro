@@ -5,7 +5,6 @@ import 'package:blocked/solver/bloc/solution_player_bloc.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 class SolutionPage extends StatefulWidget {
   SolutionPage(
@@ -143,7 +142,7 @@ class _SolutionPageState extends State<SolutionPage> {
                                             .colorScheme
                                             .surfaceVariant,
                                         leading: isInitialState
-                                            ? const Icon(MdiIcons.flag)
+                                            ? const Icon(Icons.flag)
                                             : Icon(_directionToIcon(move!)),
                                         title: Text(
                                           isInitialState
