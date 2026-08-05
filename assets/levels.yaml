@@ -1,15 +1,6 @@
 - name: Basic 1
   description: Blocked
   levels:
-    - name: B_1-1
-      hint: |-
-        Swipe or use the arrow keys to move.
-        Escape the room to win.
-      map: |-
-        *******
-        *M....e
-        *******
-
     - name: B_1-2
       hint: Knock into tile to transfer control.
       map: |-
@@ -6400,5 +6391,21 @@
         *..x*xxx....*
         *.*x..*...*.*
         *m.x...xxx..*
+        *************
+
+    - name: C_19-8
+      map: |-
+        *************
+        *x.x*x.x*x..*
+        *...*...*...*
+        *x.x.x.x.x..*
+        *.*.*.*.*...*
+        *MMM........e
+        *MMM........e
+        *MMM........e
+        *.*.*.*.*...*
+        *x.x.x.x.x..*
+        *...*...*...*
+        *x.x*x.x*x..*
         *************
 

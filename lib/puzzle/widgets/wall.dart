@@ -7,12 +7,17 @@ class PuzzleWall extends StatelessWidget {
     this.segment, {
     Key? key,
     required this.isSharp,
+    this.thickness,
     this.curve = Curves.linear,
     this.duration = const Duration(milliseconds: 0),
   }) : super(key: key);
 
   final bool isSharp;
   final Segment segment;
+
+  /// Cross-axis thickness of the wall. Defaults to [kWallWidth]. A thinner
+  /// wall stays centered on the line it would normally occupy.
+  final double? thickness;
   final Curve curve;
   final Duration duration;
 
@@ -22,15 +27,18 @@ class PuzzleWall extends StatelessWidget {
     final light = Color.lerp(wall, const Color(0xFFE8C99A), 0.35)!;
     final dark = Color.lerp(wall, Colors.black, 0.4)!;
     final horizontal = segment.width >= segment.height;
+    final fullWidth = segment.width.toWallSize();
+    final fullHeight = segment.height.toWallSize();
+    final isThin = thickness != null && thickness != kWallWidth;
 
-    return Transform.scale(
+    final body = Transform.scale(
       scaleX: (isSharp && segment.width == 0 ? 2 : 1),
       scaleY: (isSharp && segment.height == 0 ? 2 : 1),
       child: AnimatedContainer(
         curve: curve,
         duration: duration,
-        width: segment.width.toWallSize(),
-        height: segment.height.toWallSize(),
+        width: isThin && segment.width == 0 ? thickness : fullWidth,
+        height: isThin && segment.height == 0 ? thickness : fullHeight,
         decoration: isSharp
             ? ShapeDecoration(
                 shape: BeveledRectangleBorder(
@@ -72,6 +80,16 @@ class PuzzleWall extends StatelessWidget {
                 ],
               ),
       ),
+    );
+
+    if (!isThin) {
+      return body;
+    }
+
+    return SizedBox(
+      width: fullWidth,
+      height: fullHeight,
+      child: Center(child: body),
     );
   }
 }

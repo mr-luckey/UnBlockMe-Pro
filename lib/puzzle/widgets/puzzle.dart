@@ -40,6 +40,13 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
         context.select((LevelBloc bloc) => bloc.state.isCompleted);
 
     final exits = _getExits(board.width, board.height, board.walls);
+    final exitEdges = <_BoardEdge>{};
+    for (final exit in exits) {
+      final edge = _edgeOf(exit, board.width, board.height);
+      if (edge != null) {
+        exitEdges.add(edge);
+      }
+    }
 
     return RepaintBoundary(
       child: FittedBox(
@@ -97,6 +104,10 @@ class _PuzzleState extends State<Puzzle> with SingleTickerProviderStateMixin {
                     child: PuzzleWall(
                       wall,
                       isSharp: false,
+                      thickness: exitEdges
+                              .contains(_edgeOf(wall, board.width, board.height))
+                          ? kExitEdgeWallWidth
+                          : null,
                     ),
                   ),
                 for (var wall in board.sharpWalls)
@@ -172,6 +183,21 @@ List<Segment> _getExits(
   return exits;
 }
 
+enum _BoardEdge { top, bottom, left, right }
+
+/// The board edge a segment lies on, or `null` if it is not on the boundary.
+_BoardEdge? _edgeOf(Segment segment, int boardWidth, int boardHeight) {
+  if (segment.isHorizontal && segment.width > 0) {
+    if (segment.start.y == 0) return _BoardEdge.top;
+    if (segment.start.y == boardHeight) return _BoardEdge.bottom;
+  }
+  if (segment.isVertical && segment.height > 0) {
+    if (segment.start.x == 0) return _BoardEdge.left;
+    if (segment.start.x == boardWidth) return _BoardEdge.right;
+  }
+  return null;
+}
+
 class _ExitLabel extends StatelessWidget {
   const _ExitLabel({
     required this.segment,
@@ -195,15 +221,19 @@ class _ExitLabel extends StatelessWidget {
       color: Theme.of(context).colorScheme.primary,
     );
 
-    if (segment.isVertical) {
-      final turn = segment.start.x == boardWidth ? 1 : 3;
-      return RotatedBox(quarterTurns: turn, child: arrow);
+    // The arrow points along the path the block takes out of the board.
+    switch (_edgeOf(segment, boardWidth, boardHeight)) {
+      case _BoardEdge.right:
+        return arrow;
+      case _BoardEdge.bottom:
+        return RotatedBox(quarterTurns: 1, child: arrow);
+      case _BoardEdge.left:
+        return RotatedBox(quarterTurns: 2, child: arrow);
+      case _BoardEdge.top:
+        return RotatedBox(quarterTurns: 3, child: arrow);
+      case null:
+        return arrow;
     }
-
-    if (segment.start.y == boardHeight) {
-      return RotatedBox(quarterTurns: 2, child: arrow);
-    }
-    return arrow;
   }
 }
 
