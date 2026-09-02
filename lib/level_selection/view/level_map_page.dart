@@ -261,7 +261,7 @@ class _MapHeader extends StatelessWidget {
         Expanded(
           child: Center(
             child: Image.asset(
-              'assets/ui/map/banner.png',
+              'assets/ui/map/banner.webp',
               height: bannerH,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.medium,
@@ -354,7 +354,7 @@ class _StarsChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Image.asset(
-            'assets/ui/home/icon_star.png',
+            'assets/ui/home/icon_star.webp',
             height: height * 0.55,
             fit: BoxFit.contain,
             gaplessPlayback: true,

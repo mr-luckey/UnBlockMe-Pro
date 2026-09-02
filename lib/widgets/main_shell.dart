@@ -34,11 +34,11 @@ class MainShell extends StatelessWidget {
   static String _bgFor(int index) {
     switch (index) {
       case 1:
-        return 'assets/ui/map/bg.png';
+        return 'assets/ui/map/bg.webp';
       case 2:
-        return 'assets/ui/home/bg.png';
+        return 'assets/ui/home/bg.webp';
       default:
-        return 'assets/ui/home/bg.png';
+        return 'assets/ui/home/bg.webp';
     }
   }
 

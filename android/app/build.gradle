@@ -39,6 +39,10 @@ android {
         versionCode flutter.versionCode
         versionName flutter.versionName
         multiDexEnabled true
+        // Phone/tablet ABIs only — drops x86_64 emulator libs from the bundle.
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
     }
     signingConfigs {
         release {
@@ -51,8 +55,9 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled false
-            shrinkResources false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             minifyEnabled false

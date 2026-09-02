@@ -77,7 +77,7 @@ class ForestBottomNav extends StatelessWidget {
           children: [
             Positioned.fill(
               child: Image.asset(
-                'assets/ui/home/nav_wood.png',
+                'assets/ui/home/nav_wood.webp',
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.high,
               ),

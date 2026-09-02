@@ -221,7 +221,7 @@ class _LevelPageViewState extends State<_LevelPageView> {
                       fit: StackFit.expand,
                       children: [
                         Image.asset(
-                          '$_playAssets/bg.png',
+                          '$_playAssets/bg.webp',
                           fit: BoxFit.cover,
                           filterQuality: FilterQuality.high,
                         ),
@@ -525,7 +525,7 @@ class _PlayHeader extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Image.asset(
-                  'assets/ui/play/banner_blank.png',
+                  'assets/ui/play/banner_blank.webp',
                   height: bannerH,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
@@ -745,7 +745,7 @@ class _LevelCompletePanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Image.asset(
-            'assets/ui/complete/banner.png',
+            'assets/ui/complete/banner.webp',
             height: (72 * s).clamp(58.0, 86.0),
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
@@ -777,7 +777,7 @@ class _LevelCompletePanel extends StatelessWidget {
           ),
           SizedBox(height: 6 * s),
           Image.asset(
-            'assets/ui/complete/trophy.png',
+            'assets/ui/complete/trophy.webp',
             height: (88 * s).clamp(70.0, 110.0),
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,

@@ -315,7 +315,7 @@ class _HandArt extends StatelessWidget {
             ),
           ),
           Image.asset(
-            'assets/ui/hand.png',
+            'assets/ui/hand.webp',
             width: width,
             height: height,
             fit: BoxFit.contain,

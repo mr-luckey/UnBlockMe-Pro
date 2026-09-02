@@ -8,7 +8,7 @@ class GameMusic with WidgetsBindingObserver {
   GameMusic._();
   static final GameMusic instance = GameMusic._();
 
-  static const _asset = 'assets/audio/bgm_forest.wav';
+  static const _asset = 'assets/audio/bgm_forest.opus';
   static const _prefsKey = 'music.muted';
   static const _softVolume = 1.0;
 

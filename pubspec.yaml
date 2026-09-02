@@ -5,7 +5,7 @@ publish_to: "none"
 
 # App version — single source of truth for Android & iOS.
 # Format: versionName+versionCode  (e.g. 11.0.3+12 → name "11.0.3", Play Store code 12)
-version: 14.0.0
+version: 14.0.0+14
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -46,15 +46,7 @@ flutter:
 
   assets:
     - assets/
-    - assets/audio/bgm_forest.wav
-    - assets/audio/sfx_hit.wav
-    - assets/audio/sfx_slide.wav
-    - assets/audio/sfx_tap.wav
-    - assets/audio/sfx_win.wav
+    - assets/audio/
     - assets/ui/
-    - assets/ui/home/
-    - assets/ui/map/
-    - assets/ui/play/
-    - assets/ui/complete/
     - assets/notifications/
     - google_fonts/

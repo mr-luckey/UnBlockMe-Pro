@@ -114,7 +114,7 @@ class _HomeViewState extends State<_HomeView> {
                                 left: 0,
                                 right: 0,
                                 child: Image.asset(
-                                  '$_assets/title_banner.png',
+                                  '$_assets/title_banner.webp',
                                   height: titleH,
                                   fit: BoxFit.contain,
                                   filterQuality: FilterQuality.high,
@@ -145,7 +145,7 @@ class _HomeViewState extends State<_HomeView> {
                           flex: 5,
                           child: Center(
                             child: Image.asset(
-                              '$_assets/puzzle_preview.png',
+                              '$_assets/puzzle_preview.webp',
                               fit: BoxFit.contain,
                               filterQuality: FilterQuality.high,
                               gaplessPlayback: true,
@@ -168,7 +168,7 @@ class _HomeViewState extends State<_HomeView> {
                                 Expanded(
                                   child: _StatCard(
                                     scale: s,
-                                    iconAsset: '$_assets/icon_flame.png',
+                                    iconAsset: '$_assets/icon_flame.webp',
                                     label: 'STREAK',
                                     value: '${p.currentStreak}',
                                     colors: const [
@@ -181,7 +181,7 @@ class _HomeViewState extends State<_HomeView> {
                                 Expanded(
                                   child: _StatCard(
                                     scale: s,
-                                    iconAsset: '$_assets/icon_trophy.png',
+                                    iconAsset: '$_assets/icon_trophy.webp',
                                     label: 'SOLVED',
                                     value: '${p.levelsSolved}',
                                     colors: const [
@@ -194,7 +194,7 @@ class _HomeViewState extends State<_HomeView> {
                                 Expanded(
                                   child: _StatCard(
                                     scale: s,
-                                    iconAsset: '$_assets/icon_star.png',
+                                    iconAsset: '$_assets/icon_star.webp',
                                     label: 'STARS',
                                     value: '${p.totalStars}',
                                     colors: const [
@@ -209,7 +209,7 @@ class _HomeViewState extends State<_HomeView> {
                         ),
                         SizedBox(height: gap + 4),
                         _CtaButton(
-                          asset: '$_assets/btn_play.png',
+                          asset: '$_assets/btn_play.webp',
                           height: playH,
                           onTap: _play,
                           semanticLabel: 'Play',
