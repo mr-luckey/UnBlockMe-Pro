@@ -7,7 +7,7 @@
    <key>NSAllowsArbitraryLoads</key><true/>
 </dict>
 <key>GADApplicationIdentifier</key>
-<string>ca-app-pub-3940256099942544~3347511713</string>
+<string>ca-app-pub-6619866004331477~6166919646</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

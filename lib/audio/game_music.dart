@@ -1,7 +1,7 @@
 import 'package:audio_session/audio_session.dart';
+import 'package:blocked/storage/storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Soft looping calm background music for the whole app.
 class GameMusic with WidgetsBindingObserver {
@@ -25,8 +25,7 @@ class GameMusic with WidgetsBindingObserver {
   Future<void> _doInit() async {
     WidgetsBinding.instance.addObserver(this);
 
-    final prefs = await SharedPreferences.getInstance();
-    muted.value = prefs.getBool(_prefsKey) ?? false;
+    muted.value = getBool(_prefsKey) ?? false;
 
     try {
       final session = await AudioSession.instance;
@@ -81,8 +80,7 @@ class GameMusic with WidgetsBindingObserver {
 
   Future<void> setMuted(bool value) async {
     muted.value = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_prefsKey, value);
+    await setBool(_prefsKey, value);
     await _player.setVolume(value ? 0 : _softVolume);
     if (value) {
       await _player.pause();

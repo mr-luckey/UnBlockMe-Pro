@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
+import 'package:blocked/storage/storage.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const _levelPrefix = 'progress.level.';
 /// Set to false before release to restore level/chapter locks.
@@ -18,6 +18,12 @@ const _levelsSolvedKey = 'progress.levelsSolved';
 const _currentStreakKey = 'progress.currentStreak';
 const _bestStreakKey = 'progress.bestStreak';
 const _lastPlayDateKey = 'progress.lastPlayDate';
+
+/// Call during startup so the first level-complete write is not racing init.
+Future<void> warmProgressPreferences() => initLocalStorage();
+
+Future<T> _serializedProgressWrite<T>(Future<T> Function() action) =>
+    serializedWrite(action);
 
 @immutable
 class PlayerProgress {
@@ -39,36 +45,40 @@ Future<void> markLevelAsCompleted(
   required int moves,
   required int elapsedSeconds,
   required int minimumMoves,
-}) async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  final oldStars = sharedPreferences.getInt('$_starsPrefix$levelName') ?? 0;
-  final newStars =
-      calculateStars(moves: moves, minimumMoves: minimumMoves);
-  final savedStars = newStars > oldStars ? newStars : oldStars;
+}) {
+  return _serializedProgressWrite(() async {
+    final oldStars = getInt('$_starsPrefix$levelName') ?? 0;
+    final newStars =
+        calculateStars(moves: moves, minimumMoves: minimumMoves);
+    final savedStars = newStars > oldStars ? newStars : oldStars;
 
-  final wasCompleted = await isLevelCompleted(levelName);
-  await sharedPreferences.setBool('$_levelPrefix$levelName', true);
-  await sharedPreferences.setInt('$_starsPrefix$levelName', savedStars);
+    final wasCompleted = getBool('$_levelPrefix$levelName') ??
+        getBool(levelName) ??
+        false;
+    await setBool('$_levelPrefix$levelName', true);
+    await setInt('$_starsPrefix$levelName', savedStars);
 
-  final bestMoves = sharedPreferences.getInt('$_bestMovesPrefix$levelName');
-  if (bestMoves == null || moves < bestMoves) {
-    await sharedPreferences.setInt('$_bestMovesPrefix$levelName', moves);
-  }
-  final bestSeconds = sharedPreferences.getInt('$_bestSecondsPrefix$levelName');
-  if (bestSeconds == null || elapsedSeconds < bestSeconds) {
-    await sharedPreferences.setInt('$_bestSecondsPrefix$levelName', elapsedSeconds);
-  }
+    final bestMoves = getInt('$_bestMovesPrefix$levelName');
+    if (bestMoves == null || moves < bestMoves) {
+      await setInt('$_bestMovesPrefix$levelName', moves);
+    }
+    final bestSeconds = getInt('$_bestSecondsPrefix$levelName');
+    if (bestSeconds == null || elapsedSeconds < bestSeconds) {
+      await setInt('$_bestSecondsPrefix$levelName', elapsedSeconds);
+    }
 
-  if (!wasCompleted) {
-    final solved = sharedPreferences.getInt(_levelsSolvedKey) ?? 0;
-    await sharedPreferences.setInt(_levelsSolvedKey, solved + 1);
-    await _updateStreak(sharedPreferences);
-  }
+    if (!wasCompleted) {
+      final solved = getInt(_levelsSolvedKey) ?? 0;
+      await setInt(_levelsSolvedKey, solved + 1);
+      await _updateStreak();
+    }
 
-  final totalStars = await _recomputeTotalStars(sharedPreferences);
-  await sharedPreferences.setInt(_totalStarsKey, totalStars);
-  _hasProgressStreamController.add(true);
-  _playerProgressStreamController.add(await getPlayerProgress());
+    final totalStars = _recomputeTotalStars();
+    await setInt(_totalStarsKey, totalStars);
+    _hasProgressStreamController.add(true);
+    _playerProgressStreamController.add(await getPlayerProgress());
+    _mapProgressStreamController.add(null);
+  });
 }
 
 int calculateStars({
@@ -84,12 +94,12 @@ int calculateStars({
   return 1;
 }
 
-Future<void> _updateStreak(SharedPreferences preferences) async {
+Future<void> _updateStreak() async {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final todayKey = _dateKey(today);
-  final lastDateRaw = preferences.getString(_lastPlayDateKey);
-  final currentStreak = preferences.getInt(_currentStreakKey) ?? 0;
+  final lastDateRaw = getString(_lastPlayDateKey);
+  final currentStreak = getInt(_currentStreakKey) ?? 0;
 
   int nextStreak;
   if (lastDateRaw == todayKey) {
@@ -97,23 +107,31 @@ Future<void> _updateStreak(SharedPreferences preferences) async {
   } else if (lastDateRaw == null) {
     nextStreak = 1;
   } else {
-    final parts = lastDateRaw.split('-');
-    final lastDate = DateTime(
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-      int.parse(parts[2]),
-    );
-    final difference = today.difference(lastDate).inDays;
-    nextStreak = difference == 1 ? currentStreak + 1 : 1;
+    try {
+      final parts = lastDateRaw.split('-');
+      if (parts.length != 3) {
+        nextStreak = 1;
+      } else {
+        final lastDate = DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
+        final difference = today.difference(lastDate).inDays;
+        nextStreak = difference == 1 ? currentStreak + 1 : 1;
+      }
+    } catch (_) {
+      nextStreak = 1;
+    }
   }
 
-  final bestStreak = preferences.getInt(_bestStreakKey) ?? 0;
-  await preferences.setInt(_currentStreakKey, nextStreak);
-  await preferences.setInt(
+  final bestStreak = getInt(_bestStreakKey) ?? 0;
+  await setInt(_currentStreakKey, nextStreak);
+  await setInt(
     _bestStreakKey,
     nextStreak > bestStreak ? nextStreak : bestStreak,
   );
-  await preferences.setString(_lastPlayDateKey, todayKey);
+  await setString(_lastPlayDateKey, todayKey);
 }
 
 String _dateKey(DateTime value) {
@@ -122,41 +140,38 @@ String _dateKey(DateTime value) {
   return '${value.year}-$month-$day';
 }
 
-Future<int> _recomputeTotalStars(SharedPreferences sharedPreferences) async {
+int _recomputeTotalStars() {
   var sum = 0;
-  for (final key in sharedPreferences.getKeys()) {
+  for (final key in allKeys) {
     if (key.startsWith(_starsPrefix)) {
-      sum += sharedPreferences.getInt(key) ?? 0;
+      sum += getInt(key) ?? 0;
     }
   }
   return sum;
 }
 
 Future<PlayerProgress> getPlayerProgress() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
   return PlayerProgress(
-    totalStars: sharedPreferences.getInt(_totalStarsKey) ?? 0,
-    levelsSolved: sharedPreferences.getInt(_levelsSolvedKey) ?? 0,
-    currentStreak: sharedPreferences.getInt(_currentStreakKey) ?? 0,
-    bestStreak: sharedPreferences.getInt(_bestStreakKey) ?? 0,
+    totalStars: getInt(_totalStarsKey) ?? 0,
+    levelsSolved: getInt(_levelsSolvedKey) ?? 0,
+    currentStreak: getInt(_currentStreakKey) ?? 0,
+    bestStreak: getInt(_bestStreakKey) ?? 0,
   );
 }
 
 Future<int> getLevelStars(String levelName) async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  return sharedPreferences.getInt('$_starsPrefix$levelName') ?? 0;
+  return getInt('$_starsPrefix$levelName') ?? 0;
 }
 
-/// One SharedPreferences round-trip for the whole map (not N awaits).
+/// One Hive round-trip for the whole map (not N awaits).
 Future<MapLevelProgress> loadMapLevelProgress(List<String> levelNames) async {
-  final prefs = await SharedPreferences.getInstance();
   final stars = <String, int>{};
   var currentIndex = 0;
   for (var i = 0; i < levelNames.length; i++) {
     final name = levelNames[i];
-    final s = prefs.getInt('$_starsPrefix$name') ?? 0;
-    final completed = prefs.getBool('$_levelPrefix$name') ??
-        prefs.getBool(name) ??
+    final s = getInt('$_starsPrefix$name') ?? 0;
+    final completed = getBool('$_levelPrefix$name') ??
+        getBool(name) ??
         false;
     stars[name] = s;
     // Advance cursor for completed levels (stars OR completion flag).
@@ -172,7 +187,7 @@ Future<MapLevelProgress> loadMapLevelProgress(List<String> levelNames) async {
     if (unlockAllLevelsForTesting || i == 0) return true;
     final prev = levelNames[i - 1];
     final prevDone = (stars[prev] ?? 0) >= 2 ||
-        (prefs.getBool('$_levelPrefix$prev') ?? false);
+        (getBool('$_levelPrefix$prev') ?? false);
     return prevDone;
   });
 
@@ -197,44 +212,40 @@ class MapLevelProgress {
 }
 
 Future<int> getTotalStars() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  return sharedPreferences.getInt(_totalStarsKey) ?? 0;
+  return getInt(_totalStarsKey) ?? 0;
 }
 
 Future<int?> getBestMoves(String levelName) async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  return sharedPreferences.getInt('$_bestMovesPrefix$levelName');
+  return getInt('$_bestMovesPrefix$levelName');
 }
 
 Future<int?> getBestSeconds(String levelName) async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  return sharedPreferences.getInt('$_bestSecondsPrefix$levelName');
+  return getInt('$_bestSecondsPrefix$levelName');
 }
 
 Future<void> rebuildProgressStats() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  final stars = await _recomputeTotalStars(sharedPreferences);
-  await sharedPreferences.setInt(_totalStarsKey, stars);
+  final stars = _recomputeTotalStars();
+  await setInt(_totalStarsKey, stars);
   _playerProgressStreamController.add(await getPlayerProgress());
+  _mapProgressStreamController.add(null);
 }
 
 Future<bool> isLevelCompleted(String levelName) async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  return sharedPreferences.getBool('$_levelPrefix$levelName') ??
-      sharedPreferences.getBool(levelName) ??
+  return getBool('$_levelPrefix$levelName') ??
+      getBool(levelName) ??
       false;
 }
 
 Future<void> clearData() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
   _hasProgressStreamController.add(false);
 
-  for (final key in sharedPreferences.getKeys()) {
+  for (final key in allKeys.toList()) {
     if (key != AdaptiveTheme.prefKey) {
-      await sharedPreferences.remove(key);
+      await remove(key);
     }
   }
   _playerProgressStreamController.add(await getPlayerProgress());
+  _mapProgressStreamController.add(null);
 }
 
 Future<List<String>> getFirstUncompletedLevel([
@@ -246,10 +257,9 @@ Future<List<String>> getFirstUncompletedLevel([
     return ['', ''];
   }
 
-  final prefs = await SharedPreferences.getInstance();
   bool completed(String name) =>
-      prefs.getBool('$_levelPrefix$name') ?? prefs.getBool(name) ?? false;
-  int stars(String name) => prefs.getInt('$_starsPrefix$name') ?? 0;
+      getBool('$_levelPrefix$name') ?? getBool(name) ?? false;
+  int stars(String name) => getInt('$_starsPrefix$name') ?? 0;
 
   for (var i = 0; i < chapters.length; i++) {
     final chapter = chapters[i];
@@ -276,14 +286,13 @@ Future<List<String>> getFirstUncompletedLevel([
 }
 
 Future<bool> hasProgress() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
-  for (final key in sharedPreferences.getKeys()) {
-    if (key.startsWith(_levelPrefix) && (sharedPreferences.getBool(key) ?? false)) {
+  for (final key in allKeys) {
+    if (key.startsWith(_levelPrefix) && (getBool(key) ?? false)) {
       return true;
     }
     if (!key.startsWith('progress.') &&
         key != AdaptiveTheme.prefKey &&
-        (sharedPreferences.getBool(key) ?? false)) {
+        (getBool(key) ?? false)) {
       return true;
     }
   }
@@ -304,3 +313,9 @@ StreamController<PlayerProgress> _playerProgressStreamController =
 
 Stream<PlayerProgress> playerProgressStream() =>
     _playerProgressStreamController.stream;
+
+/// Fires when any per-level map data (stars / unlocks) changes.
+Stream<void> mapProgressStream() => _mapProgressStreamController.stream;
+
+StreamController<void> _mapProgressStreamController =
+    StreamController<void>.broadcast();

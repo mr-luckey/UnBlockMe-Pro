@@ -5,27 +5,10 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
-}
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-}
-
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '13'
-}
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '13.0'
 }
 
 android {
@@ -36,6 +19,7 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -51,8 +35,9 @@ android {
         // Groovy build scripts use Math.max(...) instead of Kotlin's maxOf(...).
         minSdk = Math.max(flutter.minSdkVersion, 24)
         targetSdk = 36
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        // From pubspec.yaml `version:` — synced by Flutter on build (flutter.versionName/Code).
+        versionCode flutter.versionCode
+        versionName flutter.versionName
         multiDexEnabled true
     }
     signingConfigs {
@@ -92,6 +77,7 @@ flutter {
 dependencies {
     implementation "com.google.android.gms:play-services-ads:25.1.0"
     implementation "androidx.multidex:multidex:2.0.1"
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
 }
 
 // Applied only after you add android/app/google-services.json from Firebase.

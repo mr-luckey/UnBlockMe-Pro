@@ -25,10 +25,14 @@ class MapProgressCubit extends Cubit<MapProgressState> {
     _progressSub = playerProgressStream().listen((_) {
       load(showSpinner: false);
     });
+    _mapSub = mapProgressStream().listen((_) {
+      load(showSpinner: false);
+    });
   }
 
   final List<String> levelNames;
   StreamSubscription<PlayerProgress>? _progressSub;
+  StreamSubscription<void>? _mapSub;
 
   Future<void> load({bool showSpinner = true}) async {
     if (showSpinner) {
@@ -42,6 +46,7 @@ class MapProgressCubit extends Cubit<MapProgressState> {
   @override
   Future<void> close() async {
     await _progressSub?.cancel();
+    await _mapSub?.cancel();
     return super.close();
   }
 }

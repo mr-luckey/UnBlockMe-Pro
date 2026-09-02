@@ -52,10 +52,10 @@ class _HomeViewState extends State<_HomeView> {
     _openingLevel = true;
     try {
       GameFeel.instance.tap();
+      // Always read prefs — never a stale cache (progress is local, not network).
       final level = await getFirstUncompletedLevel(widget.chapters);
       if (!mounted) return;
       if (level[0].isEmpty) return;
-      // Navigate immediately — never await audio warm-up here.
       context.read<NavigatorCubit>().navigateToLevel(level[0], level[1]);
     } finally {
       _openingLevel = false;

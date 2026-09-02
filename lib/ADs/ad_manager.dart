@@ -2,11 +2,19 @@ import 'dart:async';
 
 import 'package:blocked/ADs/ads_remote_config.dart';
 import 'package:blocked/ADs/network_status.dart';
+import 'package:blocked/core/config/ads_config.dart';
+import 'package:blocked/core/config/dev_flags.dart';
+import 'package:blocked/services/app_services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 enum RewardPlacement { hint, autoSolve }
+
+extension RewardPlacementConfig on RewardPlacement {
+  String get configName =>
+      this == RewardPlacement.hint ? 'hint' : 'auto_solve';
+}
 
 enum RewardShowResult { notReady, shown }
 
@@ -36,40 +44,18 @@ class AdManager with WidgetsBindingObserver {
   AdManager._();
   static final AdManager _instance = AdManager._();
 
-  // --- Production unit IDs ---
-  static const _prodBanner = [
-    'ca-app-pub-5561438827097019/9629852666',
-    'ca-app-pub-5561438827097019/8316770999',
-    'ca-app-pub-5561438827097019/1207482870',
-    'ca-app-pub-5561438827097019/1280589357',
-    'ca-app-pub-5561438827097019/2896923355',
-  ];
-  static const _prodInterstitial = [
-    'ca-app-pub-5561438827097019/2053926619',
-    'ca-app-pub-5561438827097019/9740844949',
-    'ca-app-pub-5561438827097019/9438280976',
-    'ca-app-pub-5561438827097019/7114681608',
-    'ca-app-pub-5561438827097019/7537921658',
-  ];
-  static const _prodHintRewarded = [
-    'ca-app-pub-5561438827097019/6764030149',
-    'ca-app-pub-5561438827097019/5450948476',
-    'ca-app-pub-5561438827097019/7397402617',
-    'ca-app-pub-5561438827097019/9999515220',
-    'ca-app-pub-5561438827097019/9535557351',
-    'ca-app-pub-5561438827097019/5488501134',
-    'ca-app-pub-5561438827097019/7373351887',
-  ];
-  static const _prodSkipRewarded = [
-    'ca-app-pub-5561438827097019/5683942253',
-    'ca-app-pub-5561438827097019/4283230677',
-    'ca-app-pub-5561438827097019/2824785130',
-    'ca-app-pub-5561438827097019/4747188542',
-    'ca-app-pub-5561438827097019/1657067333',
-    'ca-app-pub-5561438827097019/4175419460',
-    'ca-app-pub-5561438827097019/2121025205',
-    'ca-app-pub-5561438827097019/2862337799',
-  ];
+  static const _adsConfigDefaults = BlockedAdsConfig(testMode: false);
+
+  BlockedAdsConfig get _adsConfig => BlockedAdsConfig(
+        testMode: DevFlags.adsTestMode,
+        bannerAdUnits: BlockedAdsConfig.productionBannerAdUnits,
+        interstitialAdUnits: BlockedAdsConfig.productionInterstitialAdUnits,
+        rewardedAdUnits: BlockedAdsConfig.productionRewardedAdUnits,
+        minimumInterstitialInterval:
+            _adsConfigDefaults.minimumInterstitialInterval,
+        maxRetries: _adsConfigDefaults.maxRetries,
+        retryBackoff: _adsConfigDefaults.retryBackoff,
+      );
 
   AdsRemoteConfig get _rc => AdsRemoteConfig.instance;
 
@@ -88,20 +74,22 @@ class AdManager with WidgetsBindingObserver {
     RewardPlacement.autoSolve: null,
   };
 
-  AdSize? _adaptiveBannerSize;
-
-  int _bannerIndex = 0;
-  int _playBannerIndex = 0;
-  int _interstitialIndex = 0;
-  int _hintIndex = 0;
-  int _skipIndex = 0;
+  int _bannerRetryCount = 0;
+  int _playBannerRetryCount = 0;
+  int _interstitialRetryCount = 0;
+  final Map<RewardPlacement, int> _rewardRetryCount = {
+    RewardPlacement.hint: 0,
+    RewardPlacement.autoSolve: 0,
+  };
 
   int _bannerLoadGen = 0;
   int _playBannerLoadGen = 0;
 
   bool _sdkReady = false;
-  bool _bootstrapping = false;
   bool _didBootstrap = false;
+  /// Shared in-flight bootstrap — callers must await this instead of spinning
+  /// when the SDK is not ready yet (prevents microtask storms on Play tap).
+  Future<void>? _activeBootstrap;
   bool _bannerLoading = false;
   bool _playBannerLoading = false;
   bool _interstitialLoading = false;
@@ -118,10 +106,6 @@ class AdManager with WidgetsBindingObserver {
     RewardPlacement.hint: null,
     RewardPlacement.autoSolve: null,
   };
-  final Map<RewardPlacement, int> _rewardFailStreak = {
-    RewardPlacement.hint: 0,
-    RewardPlacement.autoSolve: 0,
-  };
 
   /// Shared cooldown after no-fill / throttle — blocks all rewarded loads.
   DateTime? _rewardCooldownUntil;
@@ -132,11 +116,6 @@ class AdManager with WidgetsBindingObserver {
   /// When set, all AdMob loads/init are paused (offline / network errors).
   DateTime? _offlineUntil;
   bool _offlineRetryScheduled = false;
-
-  List<String> get _bannerIds => _prodBanner;
-  List<String> get _interstitialIds => _prodInterstitial;
-  List<String> get _hintIds => _prodHintRewarded;
-  List<String> get _skipIds => _prodSkipRewarded;
 
   bool get _isOfflinePaused =>
       _offlineUntil != null && DateTime.now().isBefore(_offlineUntil!);
@@ -223,11 +202,23 @@ class AdManager with WidgetsBindingObserver {
     for (final p in RewardPlacement.values) {
       _rewardLoading[p] = false;
     }
-    // Invalidate in-flight load generations so delayed retries no-op.
     _bannerLoadGen++;
     _playBannerLoadGen++;
+    _hideBannersFromUi();
     _log('offline pause ${forDuration.inSeconds}s — no AdMob traffic');
     _scheduleOfflineWake();
+  }
+
+  /// Collapse banner slots immediately — offline / no-fill must not leave a hole.
+  void _hideBannersFromUi() {
+    final shell = _bannerAd;
+    final play = _playBannerAd;
+    _bannerAd = null;
+    _playBannerAd = null;
+    bannerAdNotifier.value = null;
+    playBannerAdNotifier.value = null;
+    _disposeBannerLater(shell);
+    _disposeBannerLater(play);
   }
 
   void _scheduleOfflineWake() {
@@ -334,12 +325,40 @@ class AdManager with WidgetsBindingObserver {
   }
 
   /// Call after the first Flutter frame (Activity must be ready).
+  ///
+  /// Concurrent callers share one in-flight run — never returns immediately while
+  /// bootstrap is still working (that used to re-trigger banner/reward loads in
+  /// a tight microtask loop when Play opened before the SDK finished init).
   Future<void> bootstrap({
     bool interstitial = true,
     bool banner = true,
     bool rewarded = true,
+  }) {
+    final inflight = _activeBootstrap;
+    if (inflight != null) return inflight;
+    if (_didBootstrap && _sdkReady) return Future<void>.value();
+
+    final done = _runBootstrap(
+      interstitial: interstitial,
+      banner: banner,
+      rewarded: rewarded,
+    );
+    _activeBootstrap = done;
+    unawaited(
+      done.whenComplete(() {
+        if (identical(_activeBootstrap, done)) {
+          _activeBootstrap = null;
+        }
+      }),
+    );
+    return done;
+  }
+
+  Future<void> _runBootstrap({
+    required bool interstitial,
+    required bool banner,
+    required bool rewarded,
   }) async {
-    if (_bootstrapping) return;
     _attachLifecycle();
     await _rc.ensureInitialized();
     _applyRemoteConfigToLoadedAds();
@@ -348,7 +367,6 @@ class AdManager with WidgetsBindingObserver {
       _scheduleOfflineWake();
       return;
     }
-    _bootstrapping = true;
     try {
       // Core ANR fix: never touch MobileAds while offline.
       if (!await _guardOnline(forceCheck: true)) {
@@ -375,11 +393,6 @@ class AdManager with WidgetsBindingObserver {
       if (wantBanner) {
         _bannerLoading = false;
         loadBannerAd(force: true);
-        Future<void>.delayed(const Duration(milliseconds: 900), () {
-          if (_playBannerAd == null && !_playBannerLoading) {
-            loadPlayBannerAd();
-          }
-        });
       }
 
       if (wantInterstitial) {
@@ -396,8 +409,6 @@ class AdManager with WidgetsBindingObserver {
     } catch (e, st) {
       _log('bootstrap error: $e\n$st');
       _didBootstrap = false;
-    } finally {
-      _bootstrapping = false;
     }
   }
 
@@ -427,30 +438,36 @@ class AdManager with WidgetsBindingObserver {
   // Banner
   // ---------------------------------------------------------------------------
 
+  /// Load the shell/home banner when the bottom [BannerAdBar] mounts.
+  void ensureShellBanner() {
+    if (!_rc.bannerAdsEnabled || !adsAvailable) return;
+    if (!_didBootstrap) {
+      unawaited(bootstrap(banner: true, interstitial: false, rewarded: false));
+      return;
+    }
+    if (_bannerAd == null && !_bannerLoading) {
+      unawaited(loadBannerAd());
+    }
+  }
+
   /// Anchored adaptive size — fills the screen width so no dead space is left
   /// beside a fixed 320x50 banner. Falls back to the standard banner.
   Future<AdSize> _bannerSize() async {
-    final cached = _adaptiveBannerSize;
-    if (cached != null) return cached;
     try {
       final view = WidgetsBinding.instance.platformDispatcher.views.first;
       final widthDp =
           (view.physicalSize.width / view.devicePixelRatio).truncate();
       if (widthDp > 0) {
-        // The "large" variant can eat up to 15% of the screen; a game board
-        // needs that space, so keep the classic anchored adaptive height.
         final adaptive = await AdSize
             // ignore: deprecated_member_use
             .getCurrentOrientationAnchoredAdaptiveBannerAdSize(widthDp);
         if (adaptive != null) {
-          _adaptiveBannerSize = adaptive;
           return adaptive;
         }
       }
     } catch (e) {
       _log('adaptive size failed: $e');
     }
-    _adaptiveBannerSize = AdSize.banner;
     return AdSize.banner;
   }
 
@@ -467,10 +484,19 @@ class AdManager with WidgetsBindingObserver {
     });
   }
 
+  void _scheduleRetry(void Function() retry, {required int attempt}) {
+    if (attempt >= _adsConfig.maxRetries) return;
+    final delay = _adsConfig.retryBackoff * (attempt + 1);
+    Future<void>.delayed(delay, () {
+      if (!_isOfflinePaused) retry();
+    });
+  }
+
   Future<void> loadBannerAd({bool force = false}) async {
     if (!_rc.bannerAdsEnabled) return;
     if (!_canRequestAds) return;
     if (_isOfflinePaused) return;
+    if (!await _guardOnline()) return;
     if (!_sdkReady) {
       unawaited(bootstrap(banner: true, interstitial: false, rewarded: false));
       return;
@@ -478,14 +504,12 @@ class AdManager with WidgetsBindingObserver {
     if (_bannerLoading && !force) return;
     if (_bannerAd != null && !force) return;
 
-    final ids = _bannerIds;
-    if (ids.isEmpty) return;
-    if (_bannerIndex >= ids.length) _bannerIndex = 0;
+    final unitId = _adsConfig.bannerUnitId('home');
+    if (unitId == null) return;
 
     // Keep the current banner visible until a replacement loads — avoids gaps.
     final gen = ++_bannerLoadGen;
     _bannerLoading = true;
-    final unitId = ids[_bannerIndex].trim();
     final size = await _bannerSize();
     if (gen != _bannerLoadGen) return;
     _log('loading banner: $unitId (${size.width}x${size.height})');
@@ -501,6 +525,7 @@ class AdManager with WidgetsBindingObserver {
             return;
           }
           _bannerLoading = false;
+          _bannerRetryCount = 0;
           final banner = loaded as BannerAd;
           final old = _bannerAd;
           _bannerAd = banner;
@@ -520,27 +545,8 @@ class AdManager with WidgetsBindingObserver {
             _enterOfflineMode();
             return;
           }
-          _bannerIndex++;
-          if (_bannerIndex < ids.length) {
-            Future<void>.delayed(
-              const Duration(milliseconds: 900),
-              () {
-                if (gen == _bannerLoadGen && !_isOfflinePaused) {
-                  unawaited(loadBannerAd(force: true));
-                }
-              },
-            );
-          } else {
-            _bannerIndex = 0;
-            Future<void>.delayed(
-              const Duration(seconds: 45),
-              () {
-                if (gen == _bannerLoadGen && !_isOfflinePaused) {
-                  unawaited(loadBannerAd(force: true));
-                }
-              },
-            );
-          }
+          final attempt = ++_bannerRetryCount;
+          _scheduleRetry(() => loadBannerAd(force: true), attempt: attempt);
         },
       ),
     );
@@ -568,10 +574,16 @@ class AdManager with WidgetsBindingObserver {
     if (!_rc.bannerAdsEnabled) return;
     if (!_canRequestAds) return;
     if (_isOfflinePaused) return;
+    if (!await _guardOnline()) return;
     if (!_sdkReady) {
       unawaited(
         bootstrap(banner: true, interstitial: false, rewarded: false).then((_) {
-          if (!_isOfflinePaused) unawaited(loadPlayBannerAd(force: force));
+          if (!_isOfflinePaused &&
+              _sdkReady &&
+              _playBannerAd == null &&
+              !_playBannerLoading) {
+            unawaited(loadPlayBannerAd(force: force));
+          }
         }),
       );
       return;
@@ -579,16 +591,8 @@ class AdManager with WidgetsBindingObserver {
     if (_playBannerLoading && !force) return;
     if (_playBannerAd != null && !force) return;
 
-    final ids = _bannerIds;
-    if (ids.isEmpty) return;
-
-    // Prefer a different unit from the shell banner when available.
-    if (ids.length > 1) {
-      _playBannerIndex = (_bannerIndex + 1) % ids.length;
-    } else {
-      _playBannerIndex = 0;
-    }
-    final unitId = ids[_playBannerIndex].trim();
+    final unitId = _adsConfig.bannerUnitId('play');
+    if (unitId == null) return;
 
     final gen = ++_playBannerLoadGen;
     _playBannerLoading = true;
@@ -607,6 +611,7 @@ class AdManager with WidgetsBindingObserver {
             return;
           }
           _playBannerLoading = false;
+          _playBannerRetryCount = 0;
           final banner = loaded as BannerAd;
           final old = _playBannerAd;
           _playBannerAd = banner;
@@ -626,14 +631,8 @@ class AdManager with WidgetsBindingObserver {
             _enterOfflineMode();
             return;
           }
-          Future<void>.delayed(
-            const Duration(seconds: 45),
-            () {
-              if (gen == _playBannerLoadGen && !_isOfflinePaused) {
-                unawaited(loadPlayBannerAd(force: true));
-              }
-            },
-          );
+          final attempt = ++_playBannerRetryCount;
+          _scheduleRetry(() => loadPlayBannerAd(force: true), attempt: attempt);
         },
       ),
     );
@@ -650,6 +649,7 @@ class AdManager with WidgetsBindingObserver {
   /// Shell banner stays loaded — the main shell hides it while a level is open.
   /// Only ensure the gameplay banner is ready (no dispose / reload flicker).
   void enterGameplayBanner() {
+    if (!_rc.bannerAdsEnabled || !adsAvailable) return;
     if (_playBannerAd == null && !_playBannerLoading) {
       unawaited(loadPlayBannerAd());
     }
@@ -686,9 +686,8 @@ class AdManager with WidgetsBindingObserver {
     if (_isOfflinePaused) return;
     if (!_sdkReady) return;
     if ((_interstitialLoading || _interstitialAd != null) && !force) return;
-    final ids = _interstitialIds;
-    if (ids.isEmpty) return;
-    if (_interstitialIndex >= ids.length) _interstitialIndex = 0;
+    final unitId = _adsConfig.interstitialUnitId('after_level');
+    if (unitId == null) return;
 
     if (force) {
       _interstitialAd?.dispose();
@@ -696,7 +695,6 @@ class AdManager with WidgetsBindingObserver {
     }
 
     _interstitialLoading = true;
-    final unitId = ids[_interstitialIndex].trim();
     _log('loading interstitial: $unitId');
 
     InterstitialAd.load(
@@ -705,6 +703,7 @@ class AdManager with WidgetsBindingObserver {
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (InterstitialAd ad) {
           _interstitialLoading = false;
+          _interstitialRetryCount = 0;
           _interstitialAd?.dispose();
           _interstitialAd = ad;
           _log('interstitial LOADED ✓ $unitId');
@@ -717,23 +716,8 @@ class AdManager with WidgetsBindingObserver {
             _enterOfflineMode();
             return;
           }
-          _interstitialIndex++;
-          if (_interstitialIndex < ids.length) {
-            Future<void>.delayed(
-              const Duration(milliseconds: 900),
-              () {
-                if (!_isOfflinePaused) loadInterstitialAd(force: true);
-              },
-            );
-          } else {
-            _interstitialIndex = 0;
-            Future<void>.delayed(
-              const Duration(seconds: 45),
-              () {
-                if (!_isOfflinePaused) loadInterstitialAd(force: true);
-              },
-            );
-          }
+          final attempt = ++_interstitialRetryCount;
+          _scheduleRetry(() => loadInterstitialAd(force: true), attempt: attempt);
         },
       ),
     );
@@ -837,7 +821,7 @@ class AdManager with WidgetsBindingObserver {
     if (!_sdkReady) {
       unawaited(
         bootstrap(interstitial: false, banner: false, rewarded: true).then((_) {
-          if (!_isOfflinePaused) {
+          if (!_isOfflinePaused && _sdkReady) {
             _loadRewardedAd(placement, userInitiated: userInitiated);
           }
         }),
@@ -871,20 +855,13 @@ class AdManager with WidgetsBindingObserver {
       return;
     }
 
-    final ids = placement == RewardPlacement.hint ? _hintIds : _skipIds;
-    if (ids.isEmpty) return;
+    final unitId = _adsConfig.rewardedUnitId(placement.configName);
+    if (unitId == null) return;
 
-    final streak = _rewardFailStreak[placement] ?? 0;
-    if (!userInitiated && streak >= ids.length * 2) {
-      _rewardFailStreak[placement] = 0;
-      _enterOfflineMode(forDuration: const Duration(seconds: 60));
-      return;
-    }
+    final retryCount = _rewardRetryCount[placement] ?? 0;
+    if (!userInitiated && retryCount >= _adsConfig.maxRetries) return;
 
     _rewardLoading[placement] = true;
-    var index = placement == RewardPlacement.hint ? _hintIndex : _skipIndex;
-    index = index % ids.length;
-    final unitId = ids[index].trim();
     _log('loading rewarded ($placement): $unitId');
 
     RewardedAd.load(
@@ -895,7 +872,7 @@ class AdManager with WidgetsBindingObserver {
           _rewardedAds[placement]?.dispose();
           _rewardedAds[placement] = ad;
           _rewardLoading[placement] = false;
-          _rewardFailStreak[placement] = 0;
+          _rewardRetryCount[placement] = 0;
           _rewardCooldownUntil = null;
           _signalRewardReady(placement);
           _log('rewarded LOADED ✓ ($placement)');
@@ -903,13 +880,7 @@ class AdManager with WidgetsBindingObserver {
         onAdFailedToLoad: (LoadAdError error) {
           _log('rewarded FAILED ✗ ($placement / $unitId): $error');
           _rewardLoading[placement] = false;
-          _rewardFailStreak[placement] = streak + 1;
-          final next = (index + 1) % ids.length;
-          if (placement == RewardPlacement.hint) {
-            _hintIndex = next;
-          } else {
-            _skipIndex = next;
-          }
+          _rewardRetryCount[placement] = (retryCount + 1);
 
           if (_isNetworkAdError(error)) {
             _enterOfflineMode();
@@ -919,16 +890,21 @@ class AdManager with WidgetsBindingObserver {
 
           final noFillOrThrottled = error.code == 3 || error.code == 1;
           final delaySec = noFillOrThrottled
-              ? (userInitiated ? 5 : 15) + (streak * 5).clamp(0, 30)
-              : 3 + streak;
+              ? (userInitiated ? 5 : 15) + (retryCount * 5).clamp(0, 30)
+              : 3 + retryCount;
           _rewardCooldownUntil =
               DateTime.now().add(Duration(seconds: delaySec));
-          Future<void>.delayed(
-            Duration(seconds: delaySec),
-            () {
-              if (!_isOfflinePaused) _loadRewardedAd(placement);
-            },
-          );
+          if (retryCount < _adsConfig.maxRetries) {
+            Future<void>.delayed(
+              Duration(seconds: delaySec),
+              () {
+                if (!_isOfflinePaused) {
+                  _loadRewardedAd(placement, userInitiated: userInitiated);
+                }
+              },
+            );
+          }
+          _completeRewardReady(placement);
         },
       ),
     );
@@ -1014,6 +990,12 @@ class AdManager with WidgetsBindingObserver {
         if (didEarn) {
           try {
             onRewardEarned();
+            unawaited(
+              analyticsService.logRewardedAdCompleted(
+                placement: placement.configName,
+                source: 'rewarded_ad',
+              ),
+            );
           } catch (e) {
             _log('reward callback error: $e');
           }

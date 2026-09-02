@@ -1,0 +1,24 @@
+{
+  "notifications": [
+    {
+      "id": "daily_001",
+      "title": "Your next challenge is waiting 🧩",
+      "body": "Can you solve today's puzzle?"
+    },
+    {
+      "id": "daily_002",
+      "title": "Ready for another challenge?",
+      "body": "A new puzzle is waiting for you."
+    },
+    {
+      "id": "daily_003",
+      "title": "A few minutes is all it takes",
+      "body": "Come back and try one more puzzle."
+    },
+    {
+      "id": "daily_004",
+      "title": "Your streak is waiting",
+      "body": "Pick up where you left off."
+    }
+  ]
+}

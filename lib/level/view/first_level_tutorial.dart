@@ -3,20 +3,18 @@ import 'dart:async';
 import 'package:blocked/level/bloc/level_bloc.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/solver/puzzle_solver.dart';
+import 'package:blocked/storage/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const _tutorialDoneKey = 'tutorial.firstLevel.completed';
 
 Future<void> markFirstLevelTutorialDone() async {
-  final preferences = await SharedPreferences.getInstance();
-  await preferences.setBool(_tutorialDoneKey, true);
+  await setBool(_tutorialDoneKey, true);
 }
 
 Future<bool> isFirstLevelTutorialDone() async {
-  final preferences = await SharedPreferences.getInstance();
-  return preferences.getBool(_tutorialDoneKey) ?? false;
+  return getBool(_tutorialDoneKey) ?? false;
 }
 
 /// Coach overlay for the very first level: a pointing hand demonstrates the

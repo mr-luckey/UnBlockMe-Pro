@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:async/async.dart';
 import 'package:blocked/ADs/ad_manager.dart';
 import 'package:blocked/ADs/network_status.dart';
 import 'package:blocked/level/level.dart';
+import 'package:blocked/services/app_services.dart';
 import 'package:blocked/solver/solver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,13 +22,6 @@ class _BoardControlsState extends State<BoardControls> {
   CancelableOperation? solutionOperation;
   final adManager = AdManager();
   final _hintCharges = ValueNotifier<int>(3);
-
-  @override
-  void initState() {
-    super.initState();
-    // Rewarded ads only when playing — don't re-bootstrap banner/interstitial.
-    adManager.prefetchRewardedAds();
-  }
 
   @override
   void dispose() {
@@ -100,9 +96,19 @@ class _BoardControlsState extends State<BoardControls> {
                             if (_hintCharges.value > 0) {
                               _hintCharges.value--;
                             }
-                            context
-                                .read<PuzzleSolverBloc>()
-                                .add(SolutionViewed());
+                            final solverBloc = context.read<PuzzleSolverBloc>();
+                            unawaited(
+                              analyticsService.logHintUsed(
+                                source: 'board_controls',
+                              ),
+                            );
+                            unawaited(
+                              analyticsService.logRewardClaimed(
+                                rewardType: 'hint',
+                                source: 'rewarded_ad',
+                              ),
+                            );
+                            solverBloc.add(SolutionViewed());
                           },
                         );
                       },
@@ -125,6 +131,12 @@ class _BoardControlsState extends State<BoardControls> {
                       placement: RewardPlacement.autoSolve,
                       onRewardEarned: () {
                         if (!mounted) return;
+                        unawaited(
+                          analyticsService.logRewardClaimed(
+                            rewardType: 'auto_solve',
+                            source: 'rewarded_ad',
+                          ),
+                        );
                         context
                             .read<PuzzleSolverBloc>()
                             .add(SolutionPlayed());

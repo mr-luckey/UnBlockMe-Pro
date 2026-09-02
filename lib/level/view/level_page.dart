@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:blocked/ADs/ad_manager.dart';
 import 'package:blocked/ADs/banner_ad_widget.dart';
+import 'package:blocked/services/app_services.dart';
 import 'package:blocked/audio/game_feel.dart';
 import 'package:blocked/level/cubit/level_hud_cubit.dart';
 import 'package:blocked/level/level.dart';
@@ -76,6 +77,7 @@ class _LevelPageView extends StatefulWidget {
 class _LevelPageViewState extends State<_LevelPageView> {
   bool _savedCompletion = false;
   bool _shownWinSheet = false;
+  bool _loggedLevelStart = false;
 
   static const _playAssets = 'assets/ui/play';
 
@@ -84,12 +86,33 @@ class _LevelPageViewState extends State<_LevelPageView> {
     super.initState();
     // Silent SFX preload only — no haptic / no auto sounds on level open.
     unawaited(GameFeel.instance.init());
-    AdManager().enterGameplayBanner();
-    AdManager().prefetchRewardedAds();
+    if (!_loggedLevelStart) {
+      _loggedLevelStart = true;
+      unawaited(
+        analyticsService.logLevelStarted(
+          levelNumber: widget.levelNumber,
+          source: 'level_page',
+        ),
+      );
+    }
+    // Defer ad work until after the first gameplay frame paints — avoids
+    // competing with navigation + board build on the same frame as Play tap.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AdManager().prefetchRewardedAds();
+    });
   }
 
   @override
   void dispose() {
+    if (!_savedCompletion) {
+      unawaited(
+        analyticsService.logLevelAbandoned(
+          levelNumber: widget.levelNumber,
+          source: 'level_page',
+        ),
+      );
+    }
     AdManager().leaveGameplayBanner();
     super.dispose();
   }
@@ -184,14 +207,13 @@ class _LevelPageViewState extends State<_LevelPageView> {
                   listenWhen: (previous, current) =>
                       previous.isCompleted != current.isCompleted ||
                       previous.latestMove != current.latestMove,
-                  listener: (context, state) {
+                  listener: (context, state) async {
                     if (state.isCompleted && !_savedCompletion) {
                       _savedCompletion = true;
                       GameFeel.instance.win();
-                      // Persist *before* result UI so Home / kill-app keep progress.
-                      unawaited(
-                        _saveCompletionAndCelebrate(context, state.moves),
-                      );
+                      // Block until prefs are on disk — online ad traffic must
+                      // not race ahead of this write.
+                      await _saveCompletionAndCelebrate(context, state.moves);
                     }
                   },
                   builder: (context, state) {
@@ -360,10 +382,11 @@ class _LevelPageViewState extends State<_LevelPageView> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 8 * s),
-                            const BannerAdBar(
+                            SizedBox(height: 12 * s),
+                            BannerAdBar(
                               slot: BannerAdSlot.play,
                               includeBottomSafeArea: true,
+                              topGap: 8 * s,
                             ),
                           ],
                         ),
@@ -442,6 +465,14 @@ class _LevelPageViewState extends State<_LevelPageView> {
       moves: moveCount,
       elapsedSeconds: hud.elapsed.inSeconds,
       minimumMoves: minimumMoves,
+    );
+    unawaited(
+      analyticsService.logLevelCompleted(
+        levelNumber: widget.levelNumber,
+        moves: moveCount,
+        timeSeconds: hud.elapsed.inSeconds,
+        source: 'level_page',
+      ),
     );
     if (!mounted) return;
     final best = await getBestMoves(widget.level.name);

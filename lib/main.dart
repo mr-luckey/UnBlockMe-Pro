@@ -5,10 +5,13 @@ import 'package:blocked/ADs/ad_manager.dart';
 import 'package:blocked/ADs/ads_remote_config.dart';
 import 'package:blocked/audio/game_feel.dart';
 import 'package:blocked/audio/game_music.dart';
+import 'package:blocked/firebase_options.dart';
 import 'package:blocked/level/level.dart';
 import 'package:blocked/models/models.dart';
 import 'package:blocked/routing/routing.dart';
+import 'package:blocked/services/app_services.dart';
 import 'package:blocked/settings/settings.dart';
+import 'package:blocked/storage/storage.dart';
 import 'package:blocked/theme/theme.dart';
 import 'package:blocked/theme/theme_presets.dart';
 import 'package:blocked/widgets/app_exit_scope.dart';
@@ -32,14 +35,21 @@ void main() async {
     return false;
   };
 
-  // Firebase is optional until google-services.json / plist are added.
-  // AdsRemoteConfig falls back to in-code defaults when init fails.
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint('Firebase init skipped: $e');
-  }
+  // Local Hive storage — fully offline, fast synchronous reads after init.
+  await initLocalStorage();
   unawaited(AdsRemoteConfig.instance.ensureInitialized());
+
+  // Firebase Analytics — Android only until GoogleService-Info.plist is added.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      unawaited(analyticsService.init());
+    } catch (e, st) {
+      debugPrint('Firebase init failed (game continues): $e\n$st');
+    }
+  }
 
   // Load during native splash only — no second Flutter splash screen.
   final results = await Future.wait<dynamic>([
@@ -83,6 +93,7 @@ class _BlockedAppState extends State<BlockedApp> {
       unawaited(GameMusic.instance.init());
       unawaited(GameFeel.instance.init());
       unawaited(GameMusic.instance.ensurePlaying());
+      unawaited(_scheduleEngagementServices());
       Future<void>.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
         unawaited(
@@ -94,6 +105,22 @@ class _BlockedAppState extends State<BlockedApp> {
         );
       });
     });
+  }
+
+  Future<void> _scheduleEngagementServices() async {
+    try {
+      final count = await localNotificationService.bootstrapScheduledNotifications();
+      if (count > 0) {
+        unawaited(
+          analyticsService.logNotificationScheduled(
+            count: count,
+            source: 'app_start',
+          ),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('Notification schedule failed (game continues): $e\n$st');
+    }
   }
 
   @override
